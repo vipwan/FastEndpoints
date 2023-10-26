@@ -6,13 +6,13 @@ FastEndpoints needs sponsorship to [sustain the project](https://github.com/Fast
 
 ---
 
-<!-- <details><summary>title text</summary></details> -->
+[//]: # (<details><summary>title text</summary></details>)
 
 ## New 🎉
 
 <details><summary>Model binding collections of 'IFormFile' from incoming form data</summary>
 
-The following forms of properties can now be automatically model bound from file form data fields.
+The following types of properties can now be automatically model bound from `file` form data fields.
 
 ```csharp
 class Request
@@ -23,26 +23,26 @@ class Request
 }
 ```
 
+When submitting collections of form files, the incoming field names can be one of the following 3 formats:
+
+|     | Format One | Format Two | Format Three |
+|-----|------------|------------|--------------|
+| # 1 | Cars       | Boats[1]   | Jets[]       |
+| # 2 | Cars       | Boats[2]   | Jets[]       |
+
 </details>
 
 <details><summary>Multiple request examples for Swagger</summary>
 
-Multiple examples for the request DTO can be specified by setting the `ExampleRequest` property of the Summary class multiple times like so:
+Multiple examples for the request DTO can be specified by either setting the `ExampleRequest` property of the Summary class multiple times or adding to
+the `RequestExamples` collection like so:
 
 ```csharp
 Summary(s =>
 {
-    s.ExampleRequest = new()
-    {
-        Description = "first",
-        Name = "name one",
-    };
-    
-    s.ExampleRequest = new()
-    {
-        Description = "second",
-        Name = "name two",
-    };
+    s.ExampleRequest = new MyRequest {...};  
+    s.ExampleRequest = new MyRequest {...};
+    s.RequestExamples.Add(new MyRequest {...});
 });
 ```
 
@@ -76,7 +76,7 @@ Thank you Wàn Yǎhǔ for the [contribution](https://github.com/FastEndpoints/Fa
 
 <details><summary>Anti-forgery token validation middleware</summary>
 
-todo: update doc page and link from here
+Please see the [documentation page](https://fast-endpoints.com/docs/security#csrf-protection-for-form-submissions-antiforgery-tokens) for details of this feature.
 
 Thank you Wàn Yǎhǔ for the [contribution](https://github.com/FastEndpoints/FastEndpoints/pull/509).
 
@@ -117,7 +117,13 @@ Thank you Mattis Bratland for the [contribution](https://github.com/FastEndpoint
 
 </details>
 
-<!-- ## Fixes 🪲 -->
+## Fixes 🪲
 
+<details><summary>Response DTO property description not being detected</summary>
 
-<!-- ## Minor Breaking Change ⚠️ -->
+When the response DTO property description was provided by a lambda expression and the respective DTO property is also decorated with `[JsonPropertyName]` attribute,
+the Swagger operation processor was not correctly setting the property description in generated Swagger spec. See #511 for more details.
+
+</details>
+
+[//]: # (## Minor Breaking Change ⚠️)
