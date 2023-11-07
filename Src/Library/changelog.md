@@ -16,6 +16,12 @@ todo: write description
 
 </details>
 
+<details><summary>Simpler way to register Pre/Post Processors with DI support</summary>
+
+ref: https://github.com/FastEndpoints/FastEndpoints/pull/528
+
+</details>
+
 <details><summary>Exception handling capability for Post-Processors</summary>
 
 todo: update doc page and link here
@@ -48,6 +54,12 @@ An object disposed error was being thrown in subsequent for file collection subm
 
 todo: write description
 ref: https://discord.com/channels/933662816458645504/1168177198415482972
+
+</details>
+
+<details><summary>Test assertions couldn't be done on ProblemDetails DTO</summary>
+
+The `ProblemDetails` DTO properties had private setter properties preventing STJ from being able to deserialize the JSON which has now been corrected.
 
 </details>
 
