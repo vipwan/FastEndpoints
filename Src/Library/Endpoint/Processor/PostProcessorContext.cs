@@ -1,6 +1,9 @@
-﻿using System.Runtime.ExceptionServices;
+﻿using System.Diagnostics.CodeAnalysis;
+using System.Runtime.ExceptionServices;
 using FluentValidation.Results;
 using Microsoft.AspNetCore.Http;
+
+#pragma warning disable CS8618
 
 namespace FastEndpoints;
 
@@ -9,11 +12,12 @@ namespace FastEndpoints;
 /// </summary>
 /// <typeparam name="TRequest">the type of the request object, which must be non-nullable.</typeparam>
 /// <typeparam name="TResponse">the type of the response object.</typeparam>
-public sealed class PostProcessorContext<TRequest, TResponse> : IPostProcessorContext<TRequest, TResponse> where TRequest : notnull
+public sealed class PostProcessorContext<TRequest, TResponse> : IPostProcessorContext<TRequest, TResponse>
 {
     /// <summary>
     /// gets the request associated with the post-processing context.
     /// </summary>
+    [NotNull]
     public TRequest Request { get; init; }
 
     /// <summary>

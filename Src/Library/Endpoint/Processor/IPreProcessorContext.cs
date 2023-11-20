@@ -1,4 +1,5 @@
-﻿using FluentValidation.Results;
+﻿using System.Diagnostics.CodeAnalysis;
+using FluentValidation.Results;
 using Microsoft.AspNetCore.Http;
 
 namespace FastEndpoints;
@@ -26,19 +27,20 @@ public interface IPreProcessorContext
     /// <summary>
     /// determines if any validation failures have occurred during processing.
     /// </summary>
-    sealed bool HasValidationFailures => ValidationFailures.Any();
+    sealed bool HasValidationFailures => ValidationFailures.Count > 0;
 }
 
 /// <summary>
 /// defines the generic interface for a pre-processor context with a specific type for the request.
 /// </summary>
 /// <typeparam name="TRequest">The type of the request object, which must be non-nullable.</typeparam>
-public interface IPreProcessorContext<out TRequest> : IPreProcessorContext where TRequest : notnull
+public interface IPreProcessorContext<out TRequest> : IPreProcessorContext
 {
     /// <summary>
     /// gets the request object of the generic type <typeparamref name="TRequest" />.
     /// This hides the non-generic version from <see cref="IPreProcessorContext" />.
     /// </summary>
+    [NotNull]
     new TRequest Request { get; }
 
     /// <summary>
