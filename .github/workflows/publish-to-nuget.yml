@@ -23,7 +23,7 @@ jobs:
             "parallelizeAssembly": false,
             "parallelizeTestCollections": false,
             "diagnosticMessages": false
-          }' > Tests/IntegrationTests/FastEndpoints/xunit.runner.json          
+          }' > Tests/IntegrationTests/FastEndpoints/xunit.runner.json
 
       - name: Run Tests
         run: dotnet test FastEndpoints.sln --configuration Release --verbosity minimal
