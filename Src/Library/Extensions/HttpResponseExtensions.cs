@@ -30,16 +30,18 @@ public static class HttpResponseExtensions
         return SerOpts.ResponseSerializer(rsp, response, "application/json", jsonSerializerContext, cancellation.IfDefault(rsp));
     }
 
+#pragma warning disable CS1574, CS1584, CS1581, CS1580
     /// <summary>
-    /// execute and send any <see cref="IResult" /> produced by the <see cref="Results" /> class in minimal apis.
+    /// execute and send any <see cref="IResult" /> produced by the <see cref="Results" /> or <see cref="TypedResults" /> classes in minimal apis.
     /// </summary>
     /// <param name="result">
-    /// the <see cref="IResult" /> instance to execute such as:
+    /// the <see cref="IResult" /> instance to execute such as from:
     /// <code>
-    /// Results.Forbid();
-    /// Results.Ok(...);
+    ///   - Results.Ok();
+    ///   - TypedResults.NotFound();
     /// </code>
     /// </param>
+#pragma warning restore CS1574, CS1584, CS1581, CS1580
     public static Task SendResultAsync(this HttpResponse rsp, IResult result)
     {
         rsp.HttpContext.MarkResponseStart();
@@ -245,15 +247,11 @@ public static class HttpResponseExtensions
     /// send a 302/301 redirect response
     /// </summary>
     /// <param name="location">the location to redirect to</param>
-    /// <param name="isPermanant">set to true for a 301 redirect. 302 is the default.</param>
-    /// <param name="cancellation">optional cancellation token. if not specified, the <c>HttpContext.RequestAborted</c> token is used.</param>
-    public static Task SendRedirectAsync(this HttpResponse rsp, string location, bool isPermanant, CancellationToken cancellation = default)
-    {
-        rsp.HttpContext.MarkResponseStart();
-        rsp.Redirect(location, isPermanant);
-
-        return rsp.StartAsync(cancellation.IfDefault(rsp));
-    }
+    /// <param name="isPermanent">set to true for a 301 redirect. 302 is the default.</param>
+    /// <param name="allowRemoteRedirects">set to true if it's ok to redirect to remote addresses, which is prone to open redirect attacks.</param>
+    /// <exception cref="InvalidOperationException">thrown if <paramref name="allowRemoteRedirects" /> is not set to true and the supplied url is not local</exception>
+    public static Task SendRedirectAsync(this HttpResponse rsp, string location, bool isPermanent, bool allowRemoteRedirects = false)
+        => SendResultAsync(rsp, allowRemoteRedirects ? Results.Redirect(location, isPermanent) : Results.LocalRedirect(location, isPermanent));
 
     /// <summary>
     /// send headers in response to a HEAD request
@@ -397,7 +395,7 @@ public static class HttpResponseExtensions
         var ct = cancellation.IfDefault(rsp);
         long id = 0;
 
-        await foreach (var item in eventStream)
+        await foreach (var item in eventStream.WithCancellation(ct))
         {
             id++;
             await rsp.WriteAsync(

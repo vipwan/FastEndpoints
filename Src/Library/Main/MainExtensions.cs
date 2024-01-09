@@ -123,6 +123,9 @@ public static class MainExtensions
 
                     hb.WithMetadata(def);
 
+                    if (def.AttribsToForward is not null)
+                        hb.WithMetadata(def.AttribsToForward.ToArray());
+
                     def.InternalConfigAction(hb); //always do this first here
 
                     if (def.AnonymousVerbs?.Contains(verb) is true)
@@ -149,6 +152,7 @@ public static class MainExtensions
                     routeToHandlerCounts.AddOrUpdate(key, 1, (_, c) => c + 1);
                     totalEndpointCount++;
                 }
+                def.AttribsToForward = null;
             }
         }
 
@@ -312,6 +316,6 @@ public static class MainExtensions
     }
 }
 
-sealed class StartupTimer { }
+sealed class StartupTimer;
 
-sealed class DuplicateHandlerRegistration { }
+sealed class DuplicateHandlerRegistration;

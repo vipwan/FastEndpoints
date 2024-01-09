@@ -8,6 +8,9 @@ using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Net.Http.Headers;
 
+// ReSharper disable UnusedParameter.Global
+// ReSharper disable MemberCanBeProtected.Global
+
 namespace FastEndpoints;
 
 /// <summary>
@@ -15,7 +18,7 @@ namespace FastEndpoints;
 /// </summary>
 /// <typeparam name="TRequest">the type of the request dto</typeparam>
 [UsedImplicitly(ImplicitUseTargetFlags.WithInheritors)]
-public abstract class Endpoint<TRequest> : Endpoint<TRequest, object?> where TRequest : notnull { }
+public abstract class Endpoint<TRequest> : Endpoint<TRequest, object?> where TRequest : notnull;
 
 /// <summary>
 /// use this base class for defining endpoints that only use a request dto and don't use a response dto but uses a request mapper.
@@ -25,7 +28,7 @@ public abstract class Endpoint<TRequest> : Endpoint<TRequest, object?> where TRe
 [UsedImplicitly(ImplicitUseTargetFlags.WithInheritors)]
 public abstract class EndpointWithMapper<TRequest, TMapper> : Endpoint<TRequest, object?>, IHasMapper<TMapper>
     where TRequest : notnull
-    where TMapper : IRequestMapper
+    where TMapper : class, IRequestMapper
 {
     TMapper? _mapper;
 
@@ -36,7 +39,7 @@ public abstract class EndpointWithMapper<TRequest, TMapper> : Endpoint<TRequest,
     [DontInject]
     public TMapper Map //access is public to support testing
     {
-        get => _mapper ??= (TMapper)Definition.GetMapper()!;
+        get => _mapper ??= Definition.GetMapper() as TMapper ?? throw new InvalidOperationException("Endpoint mapper is not set!");
         set => _mapper = value; //allow unit tests to set mapper from outside
     }
 }
@@ -90,10 +93,10 @@ public abstract partial class Endpoint<TRequest, TResponse> : BaseEndpoint, IEve
                 await HandleAsync(req, ct);
 
             if (!ResponseStarted)
-                await AutoSendResponse(HttpContext, _response, Definition.SerializerContext, ct);
+                await AutoSendResponse(HttpContext, _response!, Definition.SerializerContext, ct);
 
-            OnAfterHandle(req, _response);
-            await OnAfterHandleAsync(req, _response, ct);
+            OnAfterHandle(req, _response!);
+            await OnAfterHandleAsync(req, _response!, ct);
         }
         catch (JsonException x) when (Cfg.BndOpts.JsonExceptionTransformer is not null)
         {
@@ -101,11 +104,11 @@ public abstract partial class Endpoint<TRequest, TResponse> : BaseEndpoint, IEve
                 throw;
 
             ValidationFailures.Add(Cfg.BndOpts.JsonExceptionTransformer(x));
-            await ValidationFailed(x);
+            await ValidationFailed(x, Cfg.BndOpts.JsonExceptionStatusCode);
         }
         catch (ValidationFailureException x)
         {
-            await ValidationFailed(x, x.StatusCode);
+            await ValidationFailed(x, x.StatusCode ?? Cfg.ErrOpts.StatusCode);
         }
         catch (Exception x)
         {
@@ -113,15 +116,15 @@ public abstract partial class Endpoint<TRequest, TResponse> : BaseEndpoint, IEve
         }
         finally
         {
-            await RunPostProcessors(Definition.PostProcessorList, req, _response, HttpContext, edi, ValidationFailures, ct);
+            await RunPostProcessors(Definition.PostProcessorList, req, _response!, HttpContext, edi, ValidationFailures, ct);
 
-            //if a post-proc hasn't handled the captured exception and already written to the response, throw the captured exception.
+            //throw here if an exception has been captured and a post-processor hasn't handled it.
             //without this UseDefaultExceptionHandler() or user's custom exception handling middleware becomes useless as the exception is silently swallowed.
-            if (edi is not null && !ResponseStarted)
+            if (edi is not null && !HttpContext.EdiIsHandled())
                 edi.Throw();
         }
 
-        async Task ValidationFailed(Exception x, int? statusCode = null)
+        async Task ValidationFailed(Exception x, int statusCode)
         {
             if (!ranPreProcessors) //avoid running pre-procs twice
                 await RunPreprocessors(Definition.PreProcessorList, req, HttpContext, ValidationFailures, ct);
@@ -133,7 +136,7 @@ public abstract partial class Endpoint<TRequest, TResponse> : BaseEndpoint, IEve
                 throw x;
 
             if (!ResponseStarted) //pre-processors may have already sent a response
-                await SendErrorsAsync(statusCode ?? Cfg.ErrOpts.StatusCode, ct);
+                await SendErrorsAsync(statusCode, ct);
         }
     }
 
@@ -288,7 +291,7 @@ public abstract partial class Endpoint<TRequest, TResponse> : BaseEndpoint, IEve
 public abstract class Endpoint<TRequest, TResponse, TMapper> : Endpoint<TRequest, TResponse>, IHasMapper<TMapper>
     where TRequest : notnull
     where TResponse : notnull
-    where TMapper : IMapper
+    where TMapper : class, IMapper
 {
     TMapper? _mapper;
 
@@ -297,11 +300,9 @@ public abstract class Endpoint<TRequest, TResponse, TMapper> : Endpoint<TRequest
     /// <para>HINT: entity mappers are singletons for performance reasons. do not maintain state in the mappers.</para>
     /// </summary>
     [DontInject]
-
-    //access is public to support testing
-    public TMapper Map
+    public TMapper Map //access is public to support testing
     {
-        get => _mapper ??= (TMapper)Definition.GetMapper()!;
+        get => _mapper ??= Definition.GetMapper() as TMapper ?? throw new InvalidOperationException("Endpoint mapper is not set!");
         set => _mapper = value; //allow unit tests to set mapper from outside
     }
 
@@ -416,7 +417,7 @@ public abstract class EndpointWithoutRequest<TResponse> : Endpoint<EmptyRequest,
 [UsedImplicitly(ImplicitUseTargetFlags.WithInheritors)]
 public abstract class EndpointWithoutRequest<TResponse, TMapper> : EndpointWithoutRequest<TResponse>, IHasMapper<TMapper>
     where TResponse : notnull
-    where TMapper : IResponseMapper
+    where TMapper : class, IResponseMapper
 {
     TMapper? _mapper;
 
@@ -427,7 +428,7 @@ public abstract class EndpointWithoutRequest<TResponse, TMapper> : EndpointWitho
     [DontInject]
     public TMapper Map //access is public to support testing
     {
-        get => _mapper ??= (TMapper)Definition.GetMapper()!;
+        get => _mapper ??= Definition.GetMapper() as TMapper ?? throw new InvalidOperationException("Endpoint mapper is not set!");
         set => _mapper = value; //allow unit tests to set mapper from outside
     }
 

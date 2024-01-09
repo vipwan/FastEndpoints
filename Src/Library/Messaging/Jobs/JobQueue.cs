@@ -11,7 +11,7 @@ abstract class JobQueueBase
     //val: job queue for the command type
     //values get created when the DI container resolves each job queue type and the ctor is run.
     //see ctor in JobQueue<TCommand, TStorageRecord, TStorageProvider>
-    protected static readonly ConcurrentDictionary<Type, JobQueueBase> _allQueues = new();
+    protected static readonly ConcurrentDictionary<Type, JobQueueBase> AllQueues = new();
 
     protected abstract Task StoreJobAsync(ICommand command, DateTime? executeAfter, DateTime? expireOn, CancellationToken ct);
 
@@ -22,7 +22,7 @@ abstract class JobQueueBase
         var tCommand = command.GetType();
 
         return
-            !_allQueues.TryGetValue(tCommand, out var queue)
+            !AllQueues.TryGetValue(tCommand, out var queue)
                 ? throw new InvalidOperationException($"A job queue has not been registered for [{tCommand.FullName}]")
                 : queue.StoreJobAsync(command, executeAfter, expireOn, ct);
     }
@@ -52,7 +52,7 @@ sealed class JobQueue<TCommand, TStorageRecord, TStorageProvider> : JobQueueBase
                     IHostApplicationLifetime appLife,
                     ILogger<JobQueue<TCommand, TStorageRecord, TStorageProvider>> logger)
     {
-        _allQueues[_tCommand] = this;
+        AllQueues[_tCommand] = this;
         _storage = storageProvider;
         _appCancellation = appLife.ApplicationStopping;
         _parallelOptions.CancellationToken = _appCancellation;
@@ -107,6 +107,8 @@ sealed class JobQueue<TCommand, TStorageRecord, TStorageProvider> : JobQueueBase
             catch (Exception x)
             {
                 _log.StorageRetrieveError(QueueID, _tCommandName, x.Message);
+
+                // ReSharper disable once MethodSupportsCancellation
                 await Task.Delay(5000);
 
                 continue;
@@ -122,6 +124,8 @@ sealed class JobQueue<TCommand, TStorageRecord, TStorageProvider> : JobQueueBase
                 // which could lead to the rescheduled job being already expired by the time it's executed.
                 await (
                           _isInUse
+
+                              // ReSharper disable once MethodSupportsCancellation
                               ? Task.WhenAny(_sem.WaitAsync(_appCancellation), Task.Delay(60000))
                               : Task.WhenAny(_sem.WaitAsync(_appCancellation)));
             }
@@ -153,6 +157,8 @@ sealed class JobQueue<TCommand, TStorageRecord, TStorageProvider> : JobQueueBase
                         _log.StorageOnExecutionFailureError(QueueID, _tCommandName, xx.Message);
 
                     #pragma warning disable CA2016
+
+                        //ReSharper disable once MethodSupportsCancellation
                         await Task.Delay(5000);
                     #pragma warning restore CA2016
                     }
@@ -175,6 +181,8 @@ sealed class JobQueue<TCommand, TStorageRecord, TStorageProvider> : JobQueueBase
                     _log.StorageMarkAsCompleteError(QueueID, _tCommandName, x.Message);
 
                 #pragma warning disable CA2016
+
+                    // ReSharper disable once MethodSupportsCancellation
                     await Task.Delay(5000);
                 #pragma warning restore CA2016
                 }

@@ -219,10 +219,18 @@ sealed class OperationProcessor(DocumentOptions docOpts) : IOperationProcessor
 
         var reqDtoType = apiDescription.ParameterDescriptions.FirstOrDefault()?.Type;
         var reqDtoIsList = reqDtoType?.GetInterfaces().Contains(Types.IEnumerable);
+        var isGetRequest = apiDescription.HttpMethod == "GET";
         var reqDtoProps = reqDtoIsList is true
                               ? null
                               : reqDtoType?.GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.FlattenHierarchy).ToList();
-        var isGetRequest = apiDescription.HttpMethod == "GET";
+
+        if (reqDtoProps?.Any() is false) //see: RequestBinder.cs > static ctor
+        {
+            throw new NotSupportedException(
+                "Request DTOs without any publicly accessible properties are not supported. " +
+                $"Offending Endpoint: [{epDef.EndpointType.FullName}] " +
+                $"Offending DTO type: [{reqDtoType!.FullName}]");
+        }
 
         //store unique request param description (from each consumes/content type) for later use.
         //these are the xml comments from dto classes
@@ -597,12 +605,20 @@ sealed class OperationProcessor(DocumentOptions docOpts) : IOperationProcessor
             (prop?.PropertyType ?? Types.String).ToContextualType());
 
         prm.Kind = kind;
-        prm.IsRequired = isRequired ?? !(prop?.IsNullable() ?? true);
+
+        var defaultValFromCtorArg = prop?.GetParentCtorDefaultValue();
+        bool? hasDefaultValFromCtorArg = null;
+        if (defaultValFromCtorArg is not null)
+            hasDefaultValFromCtorArg = true;
+
+        prm.IsRequired = isRequired ??
+                         !hasDefaultValFromCtorArg ??
+                         !(prop?.IsNullable() ?? true);
 
         if (ctx.Settings.SchemaSettings.SchemaType == SchemaType.Swagger2)
-            prm.Default = prop?.GetCustomAttribute<DefaultValueAttribute>()?.Value;
+            prm.Default = prop?.GetCustomAttribute<DefaultValueAttribute>()?.Value ?? defaultValFromCtorArg;
         else
-            prm.Schema.Default = prop?.GetCustomAttribute<DefaultValueAttribute>()?.Value;
+            prm.Schema.Default = prop?.GetCustomAttribute<DefaultValueAttribute>()?.Value ?? defaultValFromCtorArg;
 
         if (ctx.Settings.SchemaSettings.GenerateExamples)
         {

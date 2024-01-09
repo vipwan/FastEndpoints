@@ -8,77 +8,79 @@ FastEndpoints needs sponsorship to [sustain the project](https://github.com/Fast
 
 [//]: # (<details><summary>title text</summary></details>)
 
-## New 🎉
+[//]: # (## New 🎉)
 
-<details><summary>Api Client generation using Kiota</summary>
+## Improvements 🚀
 
-Todo: update doc page and link here.
+<details><summary>Auto resolving of Mappers in unit tests</summary>
 
-ref: https://discord.com/channels/933662816458645504/1114736030109683782/1182711087901184021
-
-</details>
-
-<details><summary>Ability to specify/obtain descriptions with ACL generation</summary>
-
-todo: update docs and link here.
-ref: https://github.com/FastEndpoints/FastEndpoints/issues/562
+Previously it was necessary for the user to instantiate and set the mapper on endpoints when unit testing endpoints classes. It is no longer necessary to do so
+unless you want to. Existing code doesn't need to change as the `Mapper` property is still publicly settable.
 
 </details>
 
-<details><summary>[HideFromDocs] attribute for removing properties from Swagger schema</summary>
+<details><summary>Respect default values of constructor arguments when model binding</summary>
+
+The default request binder will now use the default values from the constructor arguments of the DTO when instantiating the DTO before model binding starts. For
+example, the `SomeOtherParam` property will have a value of `10` if no other binding sources provides a value for it.
 
 ```csharp
-sealed class MyRequest
-{
-    [HideFromDocs]
-    public int Internal { get; set; } //this will not appear in swagger schema
+record MyRequest(string SomeParam,
+                 int SomeOtherParam = 10);
+```
 
-    public string Name { get; set; }
+</details>
+
+<details><summary>Warn user about illegal request DTO types</summary>
+
+FastEndpoints only supports model binding with DTOs that have publicly accessible properties. The following is not supported:
+
+```csharp
+sealed class MyEndpoint : Endpoint<Guid>
+```
+
+A more detailed `NotSupportedException` is now being thrown to make it easy track down the offending endpoint.
+
+</details>
+
+[//]: # (## Fixes 🪲)
+
+## Breaking Changes ⚠️
+
+<details><summary>'SendRedirectAsync()' method signature change</summary>
+
+The method signature has been updated to the following:
+
+```csharp
+SendRedirectAsync(string location, bool isPermanent = false, bool allowRemoteRedirects = false)
+```
+
+This would be a breaking only if you were doing any of the following:
+
+- Redirecting to a remote url instead of a local url. In which case simply set `allowRemoteRedirects` to `true`. otherwise the new behavior will throw an exception.
+  this change was done to prevent [open redirect attacks](https://learn.microsoft.com/en-us/aspnet/mvc/overview/security/preventing-open-redirection-attacks) by default.
+
+- A cancellation token was passed in to the method. The new method does not support cancellation due to the underlying `Results.Redirect(...)` methods do not support
+  cancellation.
+
+</details>
+
+<details><summary>Minor behavior change for exception handling with 'Post Processors'</summary>
+
+Previously when an exception is [handled by a post-processor](https://fast-endpoints.com/docs/pre-post-processors#handling-unhandled-exceptions-with-post-processors)
+the captured exception would only be thrown out to the middleware pipeline in case the post-processor hasn't already written to the response stream. Detecting this
+reliably has proven to be difficult and now your post-processor must explicitly call the following method if it's handling the exception itself and don't need the
+exception to be thrown out to the pipeline.
+
+```csharp
+public class ExceptionProcessor : IPostProcessor<Request, Response>
+{
+    public async Task PostProcessAsync(IPostProcessorContext<Request, Response> ctx, ...)
+    {
+        ctx.MarkExceptionAsHandled();
+        //do your exception handling after this call
+    }
 }
 ```
 
 </details>
-
-## Improvements 🚀
-
-<details><summary>Treat validation rules with conditions attached as optional properties in Swagger spec.</summary>
-
-If a validation rule is conditional, like in the example below, that particular DTO property will be considered optional and will not be marked as required in the
-Swagger Schema.
-
-```csharp
-RuleFor(x => x.Id) //this property will be a required property in the swagger spec
-    .NotEmpty();   //because there's no 'When(...)' condition attached to it.
-
-RuleFor(x => x.Age) //this will be an optional property in swagger spec because
-    .NotEmpty()     //'NotEmpty()' is conditional.
-    .When(SomeCondition);
-```
-
-For this to work, the rules have to be written separately as above. I.e. the `.When(...)` condition must proceed immediately after the `.NotEmpty()` or `.NotNull()` rule.
-
-</details>
-
-<details><summary>Support for 'UrlSegmentApiVersionReader' of 'Asp.Versioning.Http'</summary>
-
-Only the `HeaderApiVersionReader` was previously supported. Support for doing versioning based on URL segments using the `Asp.Versioning.Http` package is now working
-correctly.
-
-</details>
-
-<details><summary>Micro optimization with 'Concurrent Dictionary' usage</summary>
-
-Concurrent dictionary `GetOrAdd()` overload with lambda parameter seems to perform a bit better in .NET 8. All locations that were using the other overload was
-changed to use the overload with the lambda.
-
-</details>
-
-## Fixes 🪲
-
-<details><summary>'JsonNamingPolicy.SnakeCaseLower' was causing incorrect Swagger Schema properties</summary>
-
-Snake case policy did not exist before .NET 8, so it's usage was not accounted for in the Swagger operation processor, which has now been corrected.
-
-</details>
-
-[//]: # (## Breaking Changes ⚠️)

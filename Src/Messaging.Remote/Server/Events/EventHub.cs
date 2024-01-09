@@ -74,13 +74,15 @@ sealed class EventHub<TEvent, TStorageRecord, TStorageProvider> : EventHubBase, 
             _subscribers[subID] = new();
     }
 
+    static readonly string[] _httPost = { "POST" };
+
     public void Bind(ServiceMethodProviderContext<EventHub<TEvent, TStorageRecord, TStorageProvider>> ctx)
     {
         var metadata = new List<object>();
         var eventAttributes = _tEvent.GetCustomAttributes(false);
         if (eventAttributes.Length > 0)
             metadata.AddRange(eventAttributes);
-        metadata.Add(new HttpMethodMetadata(new[] { "POST" }, acceptCorsPreflight: true));
+        metadata.Add(new HttpMethodMetadata(_httPost, acceptCorsPreflight: true));
 
         var sub = new Method<string, TEvent>(
             type: MethodType.ServerStreaming,
@@ -210,9 +212,9 @@ sealed class EventHub<TEvent, TStorageRecord, TStorageProvider> : EventHubBase, 
         if (_isRoundRobinMode)
         {
             var connectedSubIds = _subscribers
-                                 .Where(kv => kv.Value.IsConnected)
-                                 .Select(kv => kv.Key)
-                                 .ToArray(); //take a snapshot of currently connected subscriber ids
+                                  .Where(kv => kv.Value.IsConnected)
+                                  .Select(kv => kv.Key)
+                                  .ToArray(); //take a snapshot of currently connected subscriber ids
 
             if (connectedSubIds.Length <= 1)
                 return connectedSubIds;
@@ -241,6 +243,8 @@ sealed class EventHub<TEvent, TStorageRecord, TStorageProvider> : EventHubBase, 
         {
             _logger.NoSubscribersWarning(_tEvent.FullName!);
         #pragma warning disable CA2016
+
+            // ReSharper disable once MethodSupportsCancellation
             await Task.Delay(5000);
         #pragma warning restore CA2016
             if (ct.IsCancellationRequested || (DateTime.Now - startTime).TotalSeconds >= 60)
@@ -284,6 +288,8 @@ sealed class EventHub<TEvent, TStorageRecord, TStorageProvider> : EventHubBase, 
                     _errors?.OnStoreEventRecordError<TEvent>(record, createErrorCount, ex, ct);
                     _logger.StoreEventError(subId, _tEvent.FullName!, ex.Message);
                 #pragma warning disable CA2016
+
+                    // ReSharper disable once MethodSupportsCancellation
                     await Task.Delay(5000);
                 #pragma warning restore CA2016
                 }

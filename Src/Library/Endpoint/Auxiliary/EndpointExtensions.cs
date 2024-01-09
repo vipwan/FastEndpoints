@@ -73,6 +73,17 @@ static class EndpointExtensions
                         def.Throttle(thrtAttr.HitLimit, thrtAttr.DurationSeconds, thrtAttr.HeaderName);
 
                         break;
+
+                    case IProcessorAttribute procAttr:
+                        procAttr.AddToEndpointDefinition(def);
+
+                        break;
+
+                    default:
+                        def.AttribsToForward ??= [];
+                        def.AttribsToForward.Add(att);
+
+                        break;
                 }
             }
         }

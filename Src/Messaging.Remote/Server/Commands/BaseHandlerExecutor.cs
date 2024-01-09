@@ -3,6 +3,8 @@ using Grpc.Core;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 
+// ReSharper disable UnusedMemberInSuper.Global
+
 namespace FastEndpoints;
 
 abstract class BaseHandlerExecutor<TCommand, THandler, TResult, TSelf> : IMethodBinder<TSelf>
@@ -33,6 +35,8 @@ abstract class BaseHandlerExecutor<TCommand, THandler, TResult, TSelf> : IMethod
                                                         ServerCallContext serverCallContext)
         => throw new NotImplementedException();
 
+    static readonly string[] _httpPost = { "POST" };
+
     public void Bind(ServiceMethodProviderContext<TSelf> ctx)
     {
         var tExecutor = typeof(TSelf);
@@ -48,7 +52,7 @@ abstract class BaseHandlerExecutor<TCommand, THandler, TResult, TSelf> : IMethod
         var handlerAttributes = HandlerExecMethodAttributes(tExecutor);
         if (handlerAttributes?.Length > 0)
             metadata.AddRange(handlerAttributes);
-        metadata.Add(new HttpMethodMetadata(new[] { "POST" }, acceptCorsPreflight: true));
+        metadata.Add(new HttpMethodMetadata(_httpPost, acceptCorsPreflight: true));
 
         AddMethodToCtx(ctx, method, metadata);
     }
