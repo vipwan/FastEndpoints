@@ -25,6 +25,7 @@ public static class HttpResponseExtensions
                                             CancellationToken cancellation = default)
     {
         rsp.HttpContext.MarkResponseStart();
+        rsp.HttpContext.PopulateResponseHeadersFrom(response);
         rsp.StatusCode = statusCode;
 
         return SerOpts.ResponseSerializer(rsp, response, "application/json", jsonSerializerContext, cancellation.IfDefault(rsp));
@@ -112,6 +113,7 @@ public static class HttpResponseExtensions
                       throw new InvalidOperationException("LinkGenerator is not registered! Have you done the unit test setup correctly?");
 
         rsp.HttpContext.MarkResponseStart();
+        rsp.HttpContext.PopulateResponseHeadersFrom(responseBody);
         rsp.StatusCode = 201;
         rsp.Headers.Location = generateAbsoluteUrl
                                    ? linkGen.GetUriByName(rsp.HttpContext, endpointName, routeValues)
@@ -166,6 +168,7 @@ public static class HttpResponseExtensions
                                               CancellationToken cancellation = default)
     {
         rsp.HttpContext.MarkResponseStart();
+        rsp.HttpContext.PopulateResponseHeadersFrom(response);
         rsp.StatusCode = 200;
 
         return SerOpts.ResponseSerializer(rsp, response, "application/json", jsonSerializerContext, cancellation.IfDefault(rsp));

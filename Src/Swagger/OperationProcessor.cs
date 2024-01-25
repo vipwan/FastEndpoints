@@ -59,7 +59,8 @@ sealed class OperationProcessor(DocumentOptions docOpts) : IOperationProcessor
         var nameMetaData = metaData.OfType<EndpointNameMetadata>().LastOrDefault();
         var op = ctx.OperationDescription.Operation;
         var reqContent = op.RequestBody?.Content;
-        var serializer = JsonSerializer.Create(((NewtonsoftJsonSchemaGeneratorSettings)ctx.SchemaGenerator.Settings).SerializerSettings);
+        var serializerSettings = ((NewtonsoftJsonSchemaGeneratorSettings)ctx.SchemaGenerator.Settings).SerializerSettings;
+        var serializer = JsonSerializer.Create(serializerSettings);
 
         //set operation id if user has specified
         if (nameMetaData is not null)
@@ -98,22 +99,22 @@ sealed class OperationProcessor(DocumentOptions docOpts) : IOperationProcessor
                             m => m.StatusCode,
                             (k, g) =>
                             {
+                                var meta = g.Last();
                                 object? example = null;
                                 _ = epDef.EndpointSummary?.ResponseExamples.TryGetValue(k, out example);
-                                example = g.Last().GetExampleFromMetaData() ?? example;
+                                example = meta.GetExampleFromMetaData() ?? example;
                                 example = example is not null ? JToken.FromObject(example, serializer) : null;
 
-                                if (ctx.Settings.SchemaSettings.SchemaType == SchemaType.Swagger2 &&
-                                    example is JToken token &&
-                                    token.Type == JTokenType.Array)
+                                if (ctx.Settings.SchemaSettings.SchemaType == SchemaType.Swagger2 && example is JToken { Type: JTokenType.Array } token)
                                     example = token.ToString();
 
                                 return new
                                 {
                                     key = k.ToString(),
-                                    cTypes = g.Last().ContentTypes,
+                                    cTypes = meta.ContentTypes,
                                     example,
-                                    headers = epDef.EndpointSummary?.ResponseHeaders.Where(h => h.StatusCode == k).ToArray()
+                                    usrHeaders = epDef.EndpointSummary?.ResponseHeaders.Where(h => h.StatusCode == k).ToArray(),
+                                    tDto = meta.Type
                                 };
                             })
                         .ToDictionary(x => x.key);
@@ -130,19 +131,31 @@ sealed class OperationProcessor(DocumentOptions docOpts) : IOperationProcessor
                         if (x.example is not null)
                             mediaType.Example = x.example;
 
-                        if (x.headers?.Any() is true)
+                        foreach (var p in x.tDto!
+                                           .GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.FlattenHierarchy)
+                                           .Where(p => p.IsDefined(Types.ToHeaderAttribute)))
                         {
-                            foreach (var hdr in x.headers)
+                            var headerName = p.GetCustomAttribute<ToHeaderAttribute>()?.HeaderName ?? p.Name.ApplyPropNamingPolicy(docOpts);
+                            var summaryTag = p.GetXmlDocsSummary();
+                            var schema = ctx.SchemaGenerator.Generate(p.PropertyType);
+                            rsp.Value.Headers[headerName] = new()
                             {
-                                rsp.Value.Headers.Add(
-                                    new(
-                                        hdr.HeaderName,
-                                        new()
-                                        {
-                                            Description = hdr.Description,
-                                            Example = hdr.Example is not null ? JToken.FromObject(hdr.Example, serializer) : null,
-                                            Schema = hdr.Example is not null ? ctx.SchemaGenerator.Generate(hdr.Example.GetType()) : null
-                                        }));
+                                Description = summaryTag,
+                                Example = p.GetExampleJToken(serializer) ?? schema.ToSampleJson(),
+                                Schema = schema
+                            };
+                        }
+
+                        if (x.usrHeaders?.Any() is true)
+                        {
+                            foreach (var hdr in x.usrHeaders)
+                            {
+                                rsp.Value.Headers[hdr.HeaderName] = new()
+                                {
+                                    Description = hdr.Description,
+                                    Example = hdr.Example is not null ? JToken.FromObject(hdr.Example, serializer) : null,
+                                    Schema = hdr.Example is not null ? ctx.SchemaGenerator.Generate(hdr.Example.GetType()) : null
+                                };
                             }
                         }
                     }
@@ -296,6 +309,8 @@ sealed class OperationProcessor(DocumentOptions docOpts) : IOperationProcessor
                                         if (!string.Equals(pName, m.Value, StringComparison.OrdinalIgnoreCase))
                                             return false;
 
+                                        ctx.OperationDescription.Path = ctx.OperationDescription.Path.Replace(m.Value, m.Value.ApplyPropNamingPolicy(docOpts));
+
                                         RemovePropFromRequestBodyContent(p.Name, reqContent, propsToRemoveFromExample, docOpts);
 
                                         return true;
@@ -308,7 +323,8 @@ sealed class OperationProcessor(DocumentOptions docOpts) : IOperationProcessor
                                     isRequired: true,
                                     kind: OpenApiParameterKind.Path,
                                     descriptions: reqParamDescriptions,
-                                    docOpts: docOpts);
+                                    docOpts: docOpts,
+                                    serializer: serializer);
                             })
                         .ToList();
 
@@ -316,7 +332,7 @@ sealed class OperationProcessor(DocumentOptions docOpts) : IOperationProcessor
         if (reqDtoType is not null)
         {
             var qParams = reqDtoProps?
-                          .Where(p => ShouldAddQueryParam(p, reqParams, isGetRequest && !docOpts.EnableGetRequestsWithBody)) //user wants body in GET requests
+                          .Where(p => ShouldAddQueryParam(p, reqParams, isGetRequest && !docOpts.EnableGetRequestsWithBody, docOpts)) //user wants body in GET requests
                           .Select(
                               p =>
                               {
@@ -329,7 +345,8 @@ sealed class OperationProcessor(DocumentOptions docOpts) : IOperationProcessor
                                       isRequired: null,
                                       kind: OpenApiParameterKind.Query,
                                       descriptions: reqParamDescriptions,
-                                      docOpts: docOpts);
+                                      docOpts: docOpts,
+                                      serializer: serializer);
                               })
                           .ToList();
 
@@ -356,7 +373,8 @@ sealed class OperationProcessor(DocumentOptions docOpts) : IOperationProcessor
                                 isRequired: hAttrib.IsRequired,
                                 kind: OpenApiParameterKind.Header,
                                 descriptions: reqParamDescriptions,
-                                docOpts: docOpts));
+                                docOpts: docOpts,
+                                serializer: serializer));
 
                         //remove corresponding json body field if it's required. allow binding only from header.
                         if (hAttrib.IsRequired || hAttrib.RemoveFromSchema)
@@ -391,7 +409,8 @@ sealed class OperationProcessor(DocumentOptions docOpts) : IOperationProcessor
                             isRequired: null,
                             kind: OpenApiParameterKind.FormData,
                             descriptions: reqParamDescriptions,
-                            docOpts: docOpts));
+                            docOpts: docOpts,
+                            serializer: serializer));
                 }
             }
         }
@@ -449,7 +468,8 @@ sealed class OperationProcessor(DocumentOptions docOpts) : IOperationProcessor
                         isRequired: true,
                         kind: OpenApiParameterKind.Body,
                         descriptions: reqParamDescriptions,
-                        docOpts: docOpts));
+                        docOpts: docOpts,
+                        serializer: serializer));
             }
         }
 
@@ -502,9 +522,9 @@ sealed class OperationProcessor(DocumentOptions docOpts) : IOperationProcessor
         return true;
     }
 
-    static bool ShouldAddQueryParam(PropertyInfo prop, List<OpenApiParameter> reqParams, bool isGetRequest)
+    static bool ShouldAddQueryParam(PropertyInfo prop, List<OpenApiParameter> reqParams, bool isGetRequest, DocumentOptions doctops)
     {
-        var paramName = prop.Name;
+        var paramName = prop.Name.ApplyPropNamingPolicy(doctops);
 
         foreach (var attribute in prop.GetCustomAttributes())
         {
@@ -593,7 +613,8 @@ sealed class OperationProcessor(DocumentOptions docOpts) : IOperationProcessor
                                         bool? isRequired,
                                         OpenApiParameterKind kind,
                                         Dictionary<string, string>? descriptions,
-                                        DocumentOptions docOpts)
+                                        DocumentOptions docOpts,
+                                        JsonSerializer serializer)
     {
         paramName = paramName?.ApplyPropNamingPolicy(docOpts) ??
                     prop?.GetCustomAttribute<BindFromAttribute>()?.Name ?? //don't apply naming policy to attribute value
@@ -622,7 +643,7 @@ sealed class OperationProcessor(DocumentOptions docOpts) : IOperationProcessor
 
         if (ctx.Settings.SchemaSettings.GenerateExamples)
         {
-            prm.Example = prop?.GetXmlExample();
+            prm.Example = prop?.GetExampleJToken(serializer);
 
             if (prm.Example is null && prm.Default is null && prm.Schema?.Default is null && prm.IsRequired)
             {

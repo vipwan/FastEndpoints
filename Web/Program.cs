@@ -4,6 +4,7 @@ using NSwag;
 using System.Globalization;
 using TestCases.ClientStreamingTest;
 using TestCases.CommandBusTest;
+using TestCases.CommandHandlerTest;
 using TestCases.EventQueueTest;
 using TestCases.JobQueueTest;
 using TestCases.ProcessorStateTest;
@@ -106,7 +107,7 @@ app.UseRequestLocalization(
    .UseCors(b => b.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod())
    .UseAuthentication()
    .UseAuthorization()
-   .UseAntiForgery()
+   .UseAntiforgeryFE()
    .UseFastEndpoints(
        c =>
        {
@@ -142,6 +143,9 @@ app.UseRequestLocalization(
 
 if (!app.Environment.IsProduction())
     app.UseSwaggerGen();
+
+app.Services.RegisterGenericCommand(typeof(GenericCommand<>), typeof(GenericCommandHandler<>));
+app.Services.RegisterGenericCommand(typeof(GenericNoResultCommand<>), typeof(GenericNoResultCommandHandler<>));
 
 app.MapHandlers(
     h =>

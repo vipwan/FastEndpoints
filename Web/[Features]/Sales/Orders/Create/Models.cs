@@ -21,4 +21,11 @@ public class Response
     public string? AnotherMsg { get; set; }
     public Guid GuidTest { get; set; }
     public SomeEvent Event { get; set; }
+
+    [ToHeader("x-header-one")]
+    public int Header1 { get; set; }
+
+    ///<example>"2020-10-10"</example>
+    [ToHeader]
+    public DateOnly Header2 { get; set; }
 }

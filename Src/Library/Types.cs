@@ -50,12 +50,16 @@ static class Types
     internal static readonly Type JsonIgnoreAttribute = typeof(JsonIgnoreAttribute);
     internal static readonly Type JobQueueOf3 = typeof(JobQueue<,,>);
     internal static readonly Type NotImplementedAttribute = typeof(NotImplementedAttribute);
+    internal static readonly Type Null = typeof(Null);
     internal static readonly Type Object = typeof(object);
     internal static readonly Type ParseResult = typeof(ParseResult);
     internal static readonly Type QueryParamAttribute = typeof(QueryParamAttribute);
     internal static readonly Type String = typeof(string);
     internal static readonly Type SummaryOf1 = typeof(Summary<>);
     internal static readonly Type SummaryOf2 = typeof(Summary<,>);
+    internal static readonly Type ToHeaderAttribute = typeof(ToHeaderAttribute);
     internal static readonly Type Uri = typeof(Uri);
     internal static readonly Type ValidatorOf1 = typeof(AbstractValidator<>);
 }
+
+readonly struct Null { };
