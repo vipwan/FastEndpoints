@@ -1,10 +1,11 @@
 ﻿// ReSharper disable InconsistentNaming
 
-using Microsoft.AspNetCore.Http;
 using System.Net.Http.Json;
 using System.Reflection;
 using System.Text;
 using System.Text.Json;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Net.Http.Headers;
 using static FastEndpoints.Config;
 
 namespace FastEndpoints;
@@ -303,25 +304,26 @@ public static class HttpClientExtensions
         if (typeof(TResponse) == Types.EmptyResponse)
             return new(rsp, res);
 
-        try
+        if (rsp.IsSuccessStatusCode)
         {
-            if (rsp.IsSuccessStatusCode)
+            //this disposes the content stream. test code doesn't need to read it again.
+            res = await rsp.Content.ReadFromJsonAsync<TResponse>(SerOpts.Options);
+        }
+        else
+        {
+            //make a copy of the content stream to allow test code to read content stream.
+            using var copy = new MemoryStream();
+            await rsp.Content.CopyToAsync(copy); //this doesn't dispose the original stream.
+            copy.Position = 0;
+
+            try
             {
-                //this disposes the content stream. test code doesn't need to read it again.
-                res = await rsp.Content.ReadFromJsonAsync<TResponse>(SerOpts.Options);
-            }
-            else
-            {
-                //make a copy of the content stream to allow test code to read content stream.
-                using var copy = new MemoryStream();
-                await rsp.Content.CopyToAsync(copy); //this doesn't dispose the original stream.
-                copy.Position = 0;
                 res = await JsonSerializer.DeserializeAsync<TResponse>(copy, SerOpts.Options);
             }
-        }
-        catch
-        {
-            // ignored
+            catch
+            {
+                //do nothing
+            }
         }
 
         return new(rsp, res!);
@@ -337,10 +339,8 @@ public static class HttpClientExtensions
                 continue;
 
             if (p.PropertyType == Types.IFormFile)
-            {
-                var file = (IFormFile)p.GetValue(req)!;
-                form.Add(new StreamContent(file.OpenReadStream()), p.Name, file.FileName);
-            }
+                AddFileToForm((IFormFile)p.GetValue(req)!, p);
+
             else if (p.PropertyType.IsAssignableTo(Types.IEnumerableOfIFormFile))
             {
                 var files = p.GetValue(req) as IFormFileCollection;
@@ -349,7 +349,7 @@ public static class HttpClientExtensions
                     continue;
 
                 foreach (var file in files)
-                    form.Add(new StreamContent(file.OpenReadStream()), p.Name, file.FileName);
+                    AddFileToForm(file, p);
             }
             else
                 form.Add(new StringContent(p.GetValue(req)?.ToString() ?? ""), p.Name);
@@ -358,5 +358,13 @@ public static class HttpClientExtensions
         return !form.Any()
                    ? throw new InvalidOperationException("Converting the request DTO to MultipartFormDataContent was unsuccessful!")
                    : form;
+
+        void AddFileToForm(IFormFile file, MemberInfo prop)
+        {
+            var content = new StreamContent(file.OpenReadStream());
+            if (file.Headers?.ContainsKey(HeaderNames.ContentType) is true)
+                content.Headers.ContentType = new(file.ContentType);
+            form.Add(content, prop.Name, file.FileName);
+        }
     }
 }

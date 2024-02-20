@@ -1,27 +1,15 @@
-﻿using FastEndpoints;
-using Microsoft.AspNetCore.Antiforgery;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net;
+﻿using System.Net;
 using System.Net.Http.Json;
-using System.Text;
-using System.Threading.Tasks;
 using TestClass = TestCases.AntiforgeryTest;
 
 namespace Int.FastEndpoints.WebTests;
 
-public class AntiforgeryTest : TestClass<Fixture>
+public class AntiforgeryTest(Fixture f, ITestOutputHelper o) : TestClass<Fixture>(f, o)
 {
-    public AntiforgeryTest(Fixture f, ITestOutputHelper o) : base(f, o) { }
-
     [Fact]
     public async Task Html_Form_Renders_With_Af_Token()
     {
-        var (rsp, _) = await Fx.GuestClient.GETAsync<TestClass.RenderFormHtml, ErrorResponse>();
-        var content = await rsp.Content.ReadAsStringAsync();
-
-        rsp.IsSuccessStatusCode.Should().BeTrue();
+        var content = await Fx.GuestClient.GetStringAsync($"{Fx.GuestClient.BaseAddress}api/{TestClass.Routes.GetFormHtml}");
         content.Should().Contain("__RequestVerificationToken");
     }
 

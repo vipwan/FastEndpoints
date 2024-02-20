@@ -7,6 +7,7 @@ using TestCases.CommandBusTest;
 using TestCases.CommandHandlerTest;
 using TestCases.EventQueueTest;
 using TestCases.JobQueueTest;
+using TestCases.KeyedServicesTests;
 using TestCases.ProcessorStateTest;
 using TestCases.ServerStreamingTest;
 using TestCases.UnitTestConcurrencyTest;
@@ -22,6 +23,8 @@ bld.Services
    .AddFastEndpoints(o => o.SourceGeneratorDiscoveredTypes.AddRange(DiscoveredTypes.All))
    .AddJWTBearerAuth(bld.Configuration["TokenKey"]!)
    .AddAuthorization(o => o.AddPolicy("AdminOnly", b => b.RequireRole(Role.Admin)))
+   .AddKeyedTransient<IKeyedService>("AAA", (_, _) => new MyKeyedService("AAA"))
+   .AddKeyedTransient<IKeyedService>("BBB", (_, _) => new MyKeyedService("BBB"))
    .AddScoped<IEmailService, EmailService>()
    .AddSingleton(new SingltonSVC(0))
    .AddJobQueues<Job, JobStorage>()
@@ -39,6 +42,7 @@ bld.Services
                    s.SchemaSettings.SchemaType = SchemaType.OpenApi3;
                };
            o.TagCase = TagCase.TitleCase;
+           o.TagStripSymbols = true;
            o.RemoveEmptyRequestSchema = false;
        })
    .SwaggerDocument(
@@ -61,6 +65,7 @@ bld.Services
                };
            o.MaxEndpointVersion = 1;
            o.RemoveEmptyRequestSchema = false;
+           o.TagStripSymbols = true;
        })
    .SwaggerDocument(
        o =>
@@ -75,6 +80,7 @@ bld.Services
            o.MaxEndpointVersion = 2;
            o.ShowDeprecatedOps = true;
            o.RemoveEmptyRequestSchema = false;
+           o.TagStripSymbols = true;
        })
    .SwaggerDocument(
        o => //only ver3 & only FastEndpoints
@@ -163,6 +169,7 @@ app.UseJobQueues(
     {
         o.MaxConcurrency = 4;
         o.LimitsFor<JobTestCommand>(1, TimeSpan.FromSeconds(1));
+        o.StorageProbeDelay = TimeSpan.FromSeconds(5);
     });
 
 var isTestHost = app.Services.CreateScope().ServiceProvider.GetService<IEmailService>() is not EmailService;

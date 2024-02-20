@@ -314,7 +314,7 @@ sealed class ValidationSchemaProcessor : ISchemaProcessor
                                 properties[context.PropertyKey].MaxLength = lengthValidator.Max;
                             if (lengthValidator.GetType() == typeof(MinimumLengthValidator<>) ||
                                 lengthValidator.GetType() == typeof(ExactLengthValidator<>) ||
-                                properties[context.PropertyKey].MinLength == null)
+                                properties[context.PropertyKey].MinLength is null or 1)
                                 properties[context.PropertyKey].MinLength = lengthValidator.Min;
                         }
             },
@@ -394,6 +394,7 @@ sealed class ValidationSchemaProcessor : ISchemaProcessor
                         {
                             var schema = context.Schema;
                             var properties = schema.ActualProperties;
+                            properties[context.PropertyKey].Format = "email";
                             properties[context.PropertyKey].Pattern = "^[^@]+@[^@]+$"; // [^@] All chars except @
                         }
             }

@@ -63,6 +63,12 @@ public sealed class ProblemDetails : IResult
     [DefaultValue("0HMPNHL0JHL76:00000001")]
     public string TraceId { get; set; } = null!;
 
+    /// <summary>
+    /// the details of the error
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Detail { get; set; }
+
     public IEnumerable<Error> Errors { get; set; } = null!;
 
     public ProblemDetails() { }
@@ -106,7 +112,6 @@ public sealed class ProblemDetails : IResult
     }
 
 #if NET7_0_OR_GREATER
-
     static readonly string[] _contentTypes = { "application/problem+json" };
 
     /// <inheritdoc />
@@ -130,6 +135,11 @@ public sealed class ProblemDetails : IResult
     public sealed class Error
     {
         internal static readonly Comparer EqComparer = new();
+
+        /// <summary>
+        /// if set to true, the <see cref="ValidationFailure.ErrorCode" /> value of the failure will be serialized to the response.
+        /// </summary>
+        public static bool IndicateErrorCode { get; set; } = false;
 
         /// <summary>
         /// if set to true, the <see cref="FluentValidation.Severity" /> value of the failure will be serialized to the response.
@@ -166,7 +176,7 @@ public sealed class ProblemDetails : IResult
         {
             Name = Cfg.SerOpts.Options.PropertyNamingPolicy?.ConvertName(failure.PropertyName) ?? failure.PropertyName;
             Reason = failure.ErrorMessage;
-            Code = failure.ErrorCode;
+            Code = IndicateErrorCode ? failure.ErrorCode : null;
             Severity = IndicateSeverity ? failure.Severity.ToString() : null;
         }
 
