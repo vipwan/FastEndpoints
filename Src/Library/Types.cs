@@ -1,10 +1,11 @@
 ﻿// ReSharper disable InconsistentNaming
 
+using System.Collections;
+using System.Text.Json.Serialization;
 using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
-using System.Collections;
-using System.Text.Json.Serialization;
+using Microsoft.Extensions.Primitives;
 
 namespace FastEndpoints;
 
@@ -26,6 +27,7 @@ static class Types
     internal static readonly Type EndpointWithMapperOf2 = typeof(EndpointWithMapper<,>);
     internal static readonly Type EndpointWithOutRequestOf2 = typeof(EndpointWithoutRequest<,>);
     internal static readonly Type FromBodyAttribute = typeof(FromBodyAttribute);
+    internal static readonly Type FromHeaderAttribute = typeof(FromHeaderAttribute);
     internal static readonly Type HideFromDocsAttribute = typeof(HideFromDocsAttribute);
     internal static readonly Type Http = typeof(Http);
     internal static readonly Type ICommand = typeof(ICommand);
@@ -55,6 +57,7 @@ static class Types
     internal static readonly Type ParseResult = typeof(ParseResult);
     internal static readonly Type QueryParamAttribute = typeof(QueryParamAttribute);
     internal static readonly Type String = typeof(string);
+    internal static readonly Type StringSegment = typeof(StringSegment);
     internal static readonly Type SummaryOf1 = typeof(Summary<>);
     internal static readonly Type SummaryOf2 = typeof(Summary<,>);
     internal static readonly Type ToHeaderAttribute = typeof(ToHeaderAttribute);

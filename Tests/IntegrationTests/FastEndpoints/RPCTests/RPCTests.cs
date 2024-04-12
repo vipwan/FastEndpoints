@@ -6,18 +6,18 @@ using TestCases.ServerStreamingTest;
 
 namespace RemoteProcedureCalls;
 
-public class RpcTestBase : TestClass<Fixture>
+public class RpcTestBase : TestBase<AppFixture>
 {
     protected readonly RemoteConnection Remote;
 
-    public RpcTestBase(Fixture f, ITestOutputHelper o) : base(f, o)
+    protected RpcTestBase(AppFixture App)
     {
         var svcCollection = new ServiceCollection();
         svcCollection.AddSingleton<ILoggerFactory, LoggerFactory>();
         svcCollection.AddSingleton(typeof(ILogger<>), typeof(Logger<>));
         var svcProvider = svcCollection.BuildServiceProvider();
         Remote = new("http://testhost", svcProvider); //the actual hostname doesn't matter as we're replacing the httphandler below
-        Remote.ChannelOptions.HttpHandler = Fixture.CreateHandler();
+        Remote.ChannelOptions.HttpHandler = App.CreateHandler();
         Remote.Register<TestCases.CommandBusTest.VoidCommand>();
         Remote.Register<SomeCommand, string>();
         Remote.Register<EchoCommand, EchoCommand>();

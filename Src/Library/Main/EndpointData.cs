@@ -109,10 +109,10 @@ sealed class EndpointData
 
                     if (tInterfaces.Contains(Types.IHasMapper))
                     {
-                        var tMapper =
-                            t.GetGenericArgumentsOfType(Types.EndpointOf3)?[2] ??
-                            t.GetGenericArgumentsOfType(Types.EndpointWithMapperOf2)?[1] ??
-                            t.GetGenericArgumentsOfType(Types.EndpointWithOutRequestOf2)?[1];
+                        var tMapper = t.GetGenericArgumentsOfType(Types.EndpointOf3)?[2] ??
+                                      t.GetGenericArgumentsOfType(Types.EndpointWithMapperOf2)?[1] ??
+                                      t.GetGenericArgumentsOfType(Types.EndpointWithOutRequestOf2)?[1];
+
                         if (Types.IMapper.IsAssignableFrom(tMapper))
                             mapperDict[t] = tMapper;
                     }
@@ -136,6 +136,7 @@ sealed class EndpointData
                 {
                     var tEndpoint = t.GetGenericArgumentsOfType(Types.SummaryOf1)?[0] ??
                                     t.GetGenericArgumentsOfType(Types.SummaryOf2)?[0]!;
+
                     summaryDict.Add(tEndpoint, t);
 
                     continue;
@@ -235,15 +236,9 @@ sealed class EndpointData
             }).ToArray();
     }
 
-    class ValDicItem
+    class ValDicItem(Type validatorType, bool dupesFound)
     {
-        public readonly Type ValidatorType;
-        public bool HasDuplicates;
-
-        public ValDicItem(Type validatorType, bool dupesFound)
-        {
-            ValidatorType = validatorType;
-            HasDuplicates = dupesFound;
-        }
+        public readonly Type ValidatorType = validatorType;
+        public bool HasDuplicates = dupesFound;
     }
 }

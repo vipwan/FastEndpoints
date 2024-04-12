@@ -25,6 +25,7 @@ sealed class OperationProcessor(DocumentOptions docOpts) : IOperationProcessor
     static readonly TextInfo _textInfo = CultureInfo.InvariantCulture.TextInfo;
     static readonly Regex _routeParamsRegex = new("(?<={)(?:.*?)*(?=})", RegexOptions.Compiled);
     static readonly Regex _routeConstraintsRegex = new("(?<={)([^?:}]+)[^}]*(?=})", RegexOptions.Compiled);
+    static readonly string[] _illegalHeaderNames = ["Accept", "Content-Type", "Authorization"];
 
     static readonly Dictionary<string, string> _defaultDescriptions = new()
     {
@@ -237,7 +238,7 @@ sealed class OperationProcessor(DocumentOptions docOpts) : IOperationProcessor
                               ? null
                               : reqDtoType?.GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.FlattenHierarchy).ToList();
 
-        if (reqDtoType != Types.EmptyRequest && reqDtoProps?.Any() is false) //see: RequestBinder.cs > static ctor
+        if (reqDtoType != Types.EmptyRequest && reqDtoProps?.Any() is false && !GlobalConfig.AllowEmptyRequestDtos) //see: RequestBinder.cs > static ctor
         {
             throw new NotSupportedException(
                 "Request DTOs without any publicly accessible properties are not supported. " +
@@ -361,33 +362,45 @@ sealed class OperationProcessor(DocumentOptions docOpts) : IOperationProcessor
             {
                 foreach (var attribute in p.GetCustomAttributes())
                 {
-                    //add header params if there are any props marked with [FromHeader] attribute
-                    if (attribute is FromHeaderAttribute hAttrib)
+                    switch (attribute)
                     {
-                        var pName = hAttrib.HeaderName ?? p.Name;
-                        reqParams.Add(
-                            CreateParam(
-                                ctx: ctx,
-                                prop: p,
-                                paramName: pName,
-                                isRequired: hAttrib.IsRequired,
-                                kind: OpenApiParameterKind.Header,
-                                descriptions: reqParamDescriptions,
-                                docOpts: docOpts,
-                                serializer: serializer));
+                        case FromHeaderAttribute hAttrib: //add header params if there are any props marked with [FromHeader] attribute
+                        {
+                            var pName = hAttrib.HeaderName ?? p.Name;
 
-                        //remove corresponding json body field if it's required. allow binding only from header.
-                        if (hAttrib.IsRequired || hAttrib.RemoveFromSchema)
+                            if (_illegalHeaderNames.Any(n => n.Equals(pName, StringComparison.OrdinalIgnoreCase)))
+                            {
+                                RemovePropFromRequestBodyContent(p.Name, reqContent, propsToRemoveFromExample, docOpts);
+
+                                continue;
+                            }
+
+                            reqParams.Add(
+                                CreateParam(
+                                    ctx: ctx,
+                                    prop: p,
+                                    paramName: pName,
+                                    isRequired: hAttrib.IsRequired,
+                                    kind: OpenApiParameterKind.Header,
+                                    descriptions: reqParamDescriptions,
+                                    docOpts: docOpts,
+                                    serializer: serializer));
+
+                            //remove corresponding json body field if it's required. allow binding only from header.
+                            if (hAttrib.IsRequired || hAttrib.RemoveFromSchema)
+                                RemovePropFromRequestBodyContent(p.Name, reqContent, propsToRemoveFromExample, docOpts);
+
+                            break;
+                        }
+
+                        //can only be bound from claim since it's required. so remove prop from body.
+                        //can only be bound from permission since it's required. so remove prop from body.
+                        case FromClaimAttribute cAttrib when cAttrib.IsRequired || cAttrib.RemoveFromSchema:
+                        case HasPermissionAttribute pAttrib when pAttrib.IsRequired || pAttrib.RemoveFromSchema:
                             RemovePropFromRequestBodyContent(p.Name, reqContent, propsToRemoveFromExample, docOpts);
+
+                            break;
                     }
-
-                    //can only be bound from claim since it's required. so remove prop from body.
-                    if (attribute is FromClaimAttribute cAttrib && (cAttrib.IsRequired || cAttrib.RemoveFromSchema))
-                        RemovePropFromRequestBodyContent(p.Name, reqContent, propsToRemoveFromExample, docOpts);
-
-                    //can only be bound from permission since it's required. so remove prop from body.
-                    if (attribute is HasPermissionAttribute pAttrib && (pAttrib.IsRequired || pAttrib.RemoveFromSchema))
-                        RemovePropFromRequestBodyContent(p.Name, reqContent, propsToRemoveFromExample, docOpts);
                 }
             }
         }
@@ -397,21 +410,21 @@ sealed class OperationProcessor(DocumentOptions docOpts) : IOperationProcessor
         {
             foreach (var p in reqDtoProps.ToArray())
             {
-                if (p.PropertyType == Types.IFormFile)
-                {
-                    RemovePropFromRequestBodyContent(p.Name, reqContent, propsToRemoveFromExample, docOpts);
-                    reqDtoProps.Remove(p);
-                    reqParams.Add(
-                        CreateParam(
-                            ctx: ctx,
-                            prop: p,
-                            paramName: null,
-                            isRequired: null,
-                            kind: OpenApiParameterKind.FormData,
-                            descriptions: reqParamDescriptions,
-                            docOpts: docOpts,
-                            serializer: serializer));
-                }
+                if (p.PropertyType != Types.IFormFile)
+                    continue;
+
+                RemovePropFromRequestBodyContent(p.Name, reqContent, propsToRemoveFromExample, docOpts);
+                reqDtoProps.Remove(p);
+                reqParams.Add(
+                    CreateParam(
+                        ctx: ctx,
+                        prop: p,
+                        paramName: null,
+                        isRequired: null,
+                        kind: OpenApiParameterKind.FormData,
+                        descriptions: reqParamDescriptions,
+                        docOpts: docOpts,
+                        serializer: serializer));
             }
         }
 
@@ -481,32 +494,47 @@ sealed class OperationProcessor(DocumentOptions docOpts) : IOperationProcessor
                 var exCount = epDef.EndpointSummary!.RequestExamples.Count;
 
                 if (exCount == 1)
-                    requestBody.ActualSchema.Example = GetExampleFrom(epDef.EndpointSummary?.RequestExamples.First());
+                    requestBody.ActualSchema.Example = GetExampleObjectFrom(epDef.EndpointSummary?.RequestExamples.First());
                 else
                 {
-                    var i = 1;
+                    //add an index to any duplicate labels
+                    foreach (var group in epDef.EndpointSummary.RequestExamples.GroupBy(e => e.Label).Where(g => g.Count() > 1))
+                    {
+                        var i = 1;
+
+                        foreach (var ex in group)
+                        {
+                            ex.Label += $" {i}";
+                            i++;
+                        }
+                    }
 
                     foreach (var example in epDef.EndpointSummary.RequestExamples)
                     {
                         reqContent?.First().Value.Examples.Add(
-                            key: $"Example {i++}",
-                            value: new() { Value = GetExampleFrom(example) });
+                            key: example.Label,
+                            value: new()
+                            {
+                                Summary = example.Summary,
+                                Description = example.Description,
+                                Value = GetExampleObjectFrom(example)
+                            });
                     }
                 }
             }
 
-            object? GetExampleFrom(object? requestExample)
+            object? GetExampleObjectFrom(RequestExample? requestExample)
             {
                 if (requestExample is null)
                     return null;
 
                 object example;
 
-                if (requestExample.GetType().IsAssignableTo(typeof(IEnumerable)))
-                    example = JToken.FromObject(requestExample, serializer);
+                if (requestExample.Value.GetType().IsAssignableTo(typeof(IEnumerable)))
+                    example = JToken.FromObject(requestExample.Value, serializer);
                 else
                 {
-                    example = JObject.FromObject(requestExample, serializer);
+                    example = JObject.FromObject(requestExample.Value, serializer);
 
                     foreach (var p in ((JObject)example).Properties().ToArray())
                     {
@@ -624,10 +652,21 @@ sealed class OperationProcessor(DocumentOptions docOpts) : IOperationProcessor
                     prop?.GetCustomAttribute<BindFromAttribute>()?.Name ?? //don't apply naming policy to attribute value
                     prop?.Name.ApplyPropNamingPolicy(docOpts) ?? throw new InvalidOperationException("param name is required!");
 
+        Type propType;
+
+        if (prop?.PropertyType is not null)
+        {
+            propType = prop.PropertyType;
+            if (propType.Name.EndsWith("HeaderValue"))
+                propType = Types.String;
+        }
+        else
+            propType = Types.String;
+
         var prm = ctx.DocumentGenerator.CreatePrimitiveParameter(
             paramName,
             descriptions?.GetValueOrDefault(prop?.Name ?? paramName),
-            (prop?.PropertyType ?? Types.String).ToContextualType());
+            propType.ToContextualType());
 
         prm.Kind = kind;
 

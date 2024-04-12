@@ -1,52 +1,35 @@
 ﻿using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
 using NSwag;
 using NSwag.Generation.AspNetCore;
 using NSwag.Generation.Processors;
 using NSwag.Generation.Processors.Contexts;
+using NSwag.Generation.Processors.Security;
 
 namespace FastEndpoints.Swagger;
 
-sealed class OperationSecurityProcessor : IOperationProcessor
+sealed class OperationSecurityProcessor(string schemeName) : IOperationProcessor
 {
-    readonly string _schemeName;
-
-    public OperationSecurityProcessor(string schemeName)
-    {
-        _schemeName = schemeName;
-    }
-
     public bool Process(OperationProcessorContext context)
     {
         var epMeta = ((AspNetCoreOperationProcessorContext)context).ApiDescription.ActionDescriptor.EndpointMetadata;
-
-        if (epMeta is null)
-            return true;
-
-        if (epMeta.OfType<AllowAnonymousAttribute>().Any() || !epMeta.OfType<AuthorizeAttribute>().Any())
-            return true;
-
+        var authNotRequired = epMeta.OfType<AllowAnonymousAttribute>().Any() || !epMeta.OfType<AuthorizeAttribute>().Any();
         var epDef = epMeta.OfType<EndpointDefinition>().SingleOrDefault();
 
-        if (epDef == null)
-        {
-            if (epMeta.OfType<ControllerAttribute>().Any()) // it is an ApiController
-                return true;                                // todo: return false if the documentation of such ApiControllers is not wanted.
+        if (authNotRequired)
+            return true;
 
-            throw new InvalidOperationException(
-                $"Endpoint `{context.ControllerType.FullName}` is missing an endpoint description. " +
-                "This may indicate an MvcController. Consider adding `[ApiExplorerSettings(IgnoreApi = true)]`");
-        }
+        if (epDef is null) //this is not a fastendpoint
+            return new OperationSecurityScopeProcessor(schemeName).Process(context);
 
         var epSchemes = epDef.AuthSchemeNames;
 
-        if (epSchemes?.Contains(_schemeName) == false)
+        if (epSchemes?.Contains(schemeName) == false)
             return true;
 
         (context.OperationDescription.Operation.Security ??= new List<OpenApiSecurityRequirement>()).Add(
             new()
             {
-                { _schemeName, BuildScopes(epMeta.OfType<AuthorizeAttribute>()) }
+                { schemeName, BuildScopes(epMeta.OfType<AuthorizeAttribute>()) }
             });
 
         return true;

@@ -60,11 +60,8 @@ public abstract partial class Endpoint<TRequest, TResponse> : BaseEndpoint, IEve
 
         try
         {
-            req = await BindRequestAsync(
-                      Definition,
-                      HttpContext,
-                      ValidationFailures,
-                      ct); //execution stops here if JsonException is thrown and continues at try/catch below
+            //execution stops here if a JsonException is thrown and continues at try/catch below
+            req = await BindRequestAsync(Definition, HttpContext, ValidationFailures, ct);
 
             // ReSharper disable once MethodHasAsyncOverloadWithCancellation
             OnBeforeValidate(req);
@@ -91,7 +88,7 @@ public abstract partial class Endpoint<TRequest, TResponse> : BaseEndpoint, IEve
             {
                 _response = await ExecuteAsync(req, ct);
 
-                if (Definition.ExecuteAsyncReturnsIResult)
+                if (Definition is { DontAutoSend: false, ExecuteAsyncReturnsIResult: true })
                     await SendResultAsync((IResult)_response!);
             }
             else
@@ -184,6 +181,24 @@ public abstract partial class Endpoint<TRequest, TResponse> : BaseEndpoint, IEve
     /// <inheritdoc />
     public IServiceScope CreateScope()
         => Cfg.ServiceResolver.CreateScope();
+
+#if NET8_0_OR_GREATER
+    /// <inheritdoc />
+    public TService? TryResolve<TService>(string keyName) where TService : class
+        => Cfg.ServiceResolver.TryResolve<TService>(keyName);
+
+    /// <inheritdoc />
+    public object? TryResolve(Type typeOfService, string keyName)
+        => Cfg.ServiceResolver.TryResolve(typeOfService, keyName);
+
+    /// <inheritdoc />
+    public TService Resolve<TService>(string keyName) where TService : class
+        => Cfg.ServiceResolver.Resolve<TService>(keyName);
+
+    /// <inheritdoc />
+    public object Resolve(Type typeOfService, string keyName)
+        => Cfg.ServiceResolver.Resolve(typeOfService, keyName);
+#endif
 
     /// <summary>
     /// get the value of a given route parameter by specifying the resulting type and param name.

@@ -3,12 +3,12 @@ using Microsoft.AspNetCore.Http;
 
 namespace Validation;
 
-public class ValidationTests(Fixture f, ITestOutputHelper o) : TestClass<Fixture>(f, o)
+public class ValidationTests(AppFixture App) : TestBase<AppFixture>
 {
     [Fact]
     public async Task HeaderMissing()
     {
-        var (_, result) = await Fixture.AdminClient.POSTAsync<
+        var (_, result) = await App.AdminClient.POSTAsync<
                               TestCases.MissingHeaderTest.ThrowIfMissingEndpoint,
                               TestCases.MissingHeaderTest.ThrowIfMissingRequest,
                               ErrorResponse>(
@@ -26,7 +26,7 @@ public class ValidationTests(Fixture f, ITestOutputHelper o) : TestClass<Fixture
     [Fact]
     public async Task HeaderMissingButDontThrow()
     {
-        var (res, result) = await Fixture.AdminClient.POSTAsync<
+        var (res, result) = await App.AdminClient.POSTAsync<
                                 TestCases.MissingHeaderTest.DontThrowIfMissingEndpoint,
                                 TestCases.MissingHeaderTest.DontThrowIfMissingRequest,
                                 string>(

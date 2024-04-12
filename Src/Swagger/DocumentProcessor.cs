@@ -1,4 +1,5 @@
-﻿using NSwag.Generation.Processors;
+﻿using System.Net.Http.Headers;
+using NSwag.Generation.Processors;
 using NSwag.Generation.Processors.Contexts;
 
 namespace FastEndpoints.Swagger;
@@ -69,6 +70,23 @@ sealed class DocumentProcessor : IDocumentProcessor
                 }
                 op.Tags.Remove(op.Tags.SingleOrDefault(t => t.StartsWith("|")));
             }
+        }
+
+        var schemas = ctx.Document.Components.Schemas;
+        const string stringSegmentKey = "MicrosoftExtensionsPrimitivesStringSegment";
+
+        foreach (var s in schemas)
+        {
+            var headerRemoved = false;
+
+            if (s.Key.EndsWith("HeaderValue"))
+            {
+                schemas.Remove(s.Key);
+                headerRemoved = true;
+            }
+
+            if (headerRemoved && schemas.ContainsKey(stringSegmentKey))
+                schemas.Remove(stringSegmentKey);
         }
     }
 }

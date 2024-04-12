@@ -1,13 +1,13 @@
-﻿using FluentValidation.Results;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Routing;
-using Microsoft.Extensions.Primitives;
-using System.Linq.Expressions;
+﻿using System.Linq.Expressions;
 using System.Reflection;
 using System.Security.Claims;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
+using FluentValidation.Results;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Primitives;
 using static FastEndpoints.Config;
 
 namespace FastEndpoints;
@@ -45,7 +45,7 @@ public class RequestBinder<TRequest> : IRequestBinder<TRequest> where TRequest :
 
         var dtoProps = _tRequest.BindableProps();
 
-        if (!dtoProps.Any())
+        if (!dtoProps.Any() && !EpOpts.AllowEmptyRequestDtos)
         {
             throw new NotSupportedException(
                 $"Only request DTOs with publicly accessible properties are supported for request binding. " +
@@ -181,7 +181,7 @@ public class RequestBinder<TRequest> : IRequestBinder<TRequest> where TRequest :
         var req = !_isPlainTextRequest && _bindJsonBody && ctx.HttpContext.Request.HasJsonContentType()
                       ? await BindJsonBody(ctx.HttpContext.Request, ctx.JsonSerializerContext, cancellation)
                       : _isPlainTextRequest
-                          ? await BindPlainTextBody(ctx.HttpContext.Request.Body)
+                          ? await BindPlainTextBody(ctx.HttpContext.Request)
                           : InitDto();
 
         if (_bindFormFields)
@@ -204,7 +204,7 @@ public class RequestBinder<TRequest> : IRequestBinder<TRequest> where TRequest :
 
     static async ValueTask<TRequest> BindJsonBody(HttpRequest httpRequest, JsonSerializerContext? serializerCtx, CancellationToken cancellation)
     {
-        if (_fromBodyProp is null)
+        if (_fromBodyProp is null || httpRequest.Headers.ContainsKey(Constants.RoutelessTest))
             return (TRequest)(await SerOpts.RequestDeserializer(httpRequest, _tRequest, serializerCtx, cancellation) ?? InitDto());
 
         var req = InitDto();
@@ -216,11 +216,14 @@ public class RequestBinder<TRequest> : IRequestBinder<TRequest> where TRequest :
         return req;
     }
 
-    static async ValueTask<TRequest> BindPlainTextBody(Stream body)
+    static async ValueTask<TRequest> BindPlainTextBody(HttpRequest request)
     {
         var req = (IPlainTextRequest)InitDto();
-        using var streamReader = new StreamReader(body);
-        req.Content = await streamReader.ReadToEndAsync();
+        var reader = new StreamReader(request.Body);
+        req.Content = await reader.ReadToEndAsync();
+        request.HttpContext.Response.RegisterForDispose(reader); //disposing the reader immediately causes the request body to also get disposed.
+        if (request.Body.CanSeek)                                //EnableBuffering() is used, so rewind. form binding fails if not rewound.
+            request.Body.Seek(0, SeekOrigin.Begin);
 
         return (TRequest)req;
     }

@@ -13,21 +13,25 @@ using Microsoft.AspNetCore.Http;
 
 namespace FastEndpoints.Testing;
 
-public abstract class BaseFixture
+/// <summary>
+/// base class for <see cref="AppFixture{TProgram}" />.
+/// </summary>
+public abstract class BaseFixture : IFaker
 {
-    protected static readonly Faker Faker = new();
+    static readonly Faker _faker = new();
+
+    /// <inheritdoc />
+    public Faker Fake => _faker;
+
     protected static readonly ConcurrentDictionary<Type, object> WafCache = new();
 }
 
 /// <summary>
-/// inherit this class to create a class fixture for an implementation of <see cref="TestClass{TFixture}" />.
+/// inherit this class to create a class fixture for an implementation of <see cref="TestBase{TFixture}" />.
 /// </summary>
 /// <typeparam name="TProgram">the type of the web application to bootstrap via <see cref="WebApplicationFactory{TEntryPoint}" /></typeparam>
-public abstract class TestFixture<TProgram> : BaseFixture, IAsyncLifetime, IFixture where TProgram : class
+public abstract class AppFixture<TProgram> : BaseFixture, IAsyncLifetime where TProgram : class
 {
-    /// <inheritdoc />
-    public Faker Fake => Faker;
-
     /// <summary>
     /// the service provider of the bootstrapped web application
     /// </summary>
@@ -44,64 +48,44 @@ public abstract class TestFixture<TProgram> : BaseFixture, IAsyncLifetime, IFixt
     public HttpClient Client { get; set; } = null!;
 
     WebApplicationFactory<TProgram> _app = null!;
+    readonly IMessageSink? _messageSink;
+    readonly ITestOutputHelper? _outputHelper;
 
     //reason for ctor overloads: https://github.com/FastEndpoints/FastEndpoints/pull/548
-    protected TestFixture(IMessageSink s)
+    protected AppFixture(IMessageSink s)
     {
-        Initialize(s);
+        _messageSink = s;
     }
 
-    protected TestFixture(ITestOutputHelper h)
+    protected AppFixture(ITestOutputHelper h)
     {
-        Initialize(null, h);
+        _outputHelper = h;
     }
 
-    protected TestFixture(IMessageSink s, ITestOutputHelper h)
+    protected AppFixture(IMessageSink s, ITestOutputHelper h)
     {
-        Initialize(s, h);
+        _messageSink = s;
+        _outputHelper = h;
     }
 
-    protected TestFixture()
-    {
-        Initialize();
-    }
-
-    void Initialize(IMessageSink? s = null, ITestOutputHelper? h = null)
-    {
-        _app = (WebApplicationFactory<TProgram>)
-            WafCache.GetOrAdd(
-                GetType(), //each derived fixture type  gets it's own waf/app instance. it is cached and reused.
-                WafInitializer);
-        Client = _app.CreateClient();
-
-        object WafInitializer(Type _)
-            => new WebApplicationFactory<TProgram>().WithWebHostBuilder(
-                b =>
-                {
-                    b.UseEnvironment("Testing");
-                    b.ConfigureLogging(
-                        l =>
-                        {
-                            l.ClearProviders();
-                            if (s is not null)
-                                l.AddXUnit(s);
-                            if (h is not null)
-                                l.AddXUnit(h);
-                        });
-                    b.ConfigureTestServices(ConfigureServices);
-                    ConfigureApp(b);
-                });
-    }
+    protected AppFixture() { }
 
     /// <summary>
-    /// override this method if you'd like to do some one-time setup for the test-class.
-    /// it is run before any of the test-methods of the class is executed.
+    /// this will be called before the WAF is initialized. override this method if you'd like to do something before the WAF is initialized that is going to contribute to
+    /// the creation of the WAF, such as initialization of a 'TestContainer'.
+    /// </summary>
+    protected virtual Task PreSetupAsync()
+        => Task.CompletedTask;
+
+    /// <summary>
+    /// override this method if you'd like to do some one-time setup for the fixture.
+    /// it is run before any of the test-methods of the class is executed, but after the WAF is initialized.
     /// </summary>
     protected virtual Task SetupAsync()
         => Task.CompletedTask;
 
     /// <summary>
-    /// override this method if you'd like to do some one-time teardown for the test-class.
+    /// override this method if you'd like to do some one-time teardown for the fixture.
     /// it is run after all test-methods have executed.
     /// </summary>
     protected virtual Task TearDownAsync()
@@ -149,12 +133,53 @@ public abstract class TestFixture<TProgram> : BaseFixture, IAsyncLifetime, IFixt
         => _app.Server.CreateHandler();
 #endif
 
-    public Task InitializeAsync()
-        => SetupAsync();
+    async Task IAsyncLifetime.InitializeAsync()
+    {
+        await PreSetupAsync();
 
-    public virtual async Task DisposeAsync()
+        _app = (WebApplicationFactory<TProgram>)
+            WafCache.GetOrAdd(
+                GetType(), //each derived fixture type  gets it's own waf/app instance. it is cached and reused.
+                WafInitializer);
+        Client = _app.CreateClient();
+
+        await SetupAsync();
+
+        object WafInitializer(Type _)
+            => new WebApplicationFactory<TProgram>().WithWebHostBuilder(
+                b =>
+                {
+                    b.UseEnvironment("Testing");
+                    b.ConfigureLogging(
+                        l =>
+                        {
+                            l.ClearProviders();
+                            if (_messageSink is not null)
+                                l.AddXUnit(_messageSink);
+                            if (_outputHelper is not null)
+                                l.AddXUnit(_outputHelper);
+                        });
+                    b.ConfigureTestServices(ConfigureServices);
+                    ConfigureApp(b);
+                });
+    }
+
+    async Task IAsyncLifetime.DisposeAsync()
     {
         await TearDownAsync();
         Client.Dispose();
     }
+}
+
+//TODO: remove this class at v6.0
+[Obsolete("Use 'AppFixture<TProgram>' abstract class instead of this class going forward.", false)]
+public abstract class TestFixture<TProgram> : AppFixture<TProgram> where TProgram : class
+{
+    protected TestFixture(IMessageSink s) : base(s) { }
+
+    protected TestFixture(ITestOutputHelper h) : base(h) { }
+
+    protected TestFixture(IMessageSink s, ITestOutputHelper h) : base(s, h) { }
+
+    protected TestFixture() { }
 }
