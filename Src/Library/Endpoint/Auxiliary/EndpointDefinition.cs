@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http.Metadata;
 using Microsoft.AspNetCore.Mvc;
 using static FastEndpoints.Config;
 using static FastEndpoints.Constants;
@@ -24,10 +25,10 @@ public sealed class EndpointDefinition(Type endpointType, Type requestDtoType, T
     public Type? MapperType { get; internal set; }
     public Type ReqDtoType { get; init; } = requestDtoType;
     public Type ResDtoType { get; init; } = responseDtoType;
-    public string[]? Routes { get; internal set; }
+    public string[] Routes { get; internal set; } = [];
     public string SecurityPolicyName => $"epPolicy:{EndpointType.FullName}";
     public Type? ValidatorType { get; internal set; }
-    public string[]? Verbs { get; internal set; }
+    public string[] Verbs { get; internal set; } = [];
     public EpVersion Version { get; } = new();
 
     //these props can be changed in global config using methods below
@@ -54,7 +55,7 @@ public sealed class EndpointDefinition(Type endpointType, Type requestDtoType, T
 
     //only accessible to internal code
     internal bool AcceptsAnyContentType;
-    internal bool? AcceptsMetaDataPresent;
+    internal bool AcceptsMetaDataPresent;
     internal List<object>? AttribsToForward;
     internal bool ExecuteAsyncImplemented;
     bool? _execReturnsIResults;
@@ -63,8 +64,6 @@ public sealed class EndpointDefinition(Type endpointType, Type requestDtoType, T
     internal HitCounter? HitCounter { get; private set; }
     internal Action<RouteHandlerBuilder> InternalConfigAction = null!;
     internal bool ImplementsConfigure;
-    ToHeaderProp[]? _toHeaderProps;
-    internal ToHeaderProp[] ToHeaderProps => _toHeaderProps ??= GetToHeaderProps();
     internal readonly List<object> PreProcessorList = [];
     internal int PreProcessorPosition;
     internal readonly List<object> PostProcessorList = [];
@@ -76,6 +75,8 @@ public sealed class EndpointDefinition(Type endpointType, Type requestDtoType, T
     internal JsonSerializerContext? SerializerContext;
     internal ResponseCacheAttribute? ResponseCacheSettings { get; private set; }
     internal IResponseInterceptor? ResponseIntrcptr { get; private set; }
+    ToHeaderProp[]? _toHeaderProps;
+    internal ToHeaderProp[] ToHeaderProps => _toHeaderProps ??= GetToHeaderProps();
     internal Action<RouteHandlerBuilder>? UserConfigAction { get; private set; }
 
     /// <summary>
@@ -104,7 +105,7 @@ public sealed class EndpointDefinition(Type endpointType, Type requestDtoType, T
     /// </summary>
     /// <param name="dontAutoBindFormData">
     /// set 'true' to disable auto binding of form data which enables uploading and reading of large files without buffering to memory/disk.
-    /// you can access the multipart sections for reading via the FormFileSectionsAsync() method.
+    /// you can access the multipart sections for reading via the <see cref="Endpoint{TRequest,TResponse}.FormFileSectionsAsync" /> method.
     /// </param>
     public void AllowFileUploads(bool dontAutoBindFormData = false)
     {
@@ -127,8 +128,20 @@ public sealed class EndpointDefinition(Type endpointType, Type requestDtoType, T
     public void AuthSchemes(params string[] authSchemeNames)
     {
         AuthSchemeNames?.AddRange(authSchemeNames);
-        AuthSchemeNames ??= new(authSchemeNames);
+        AuthSchemeNames ??= [..authSchemeNames];
     }
+
+    /// <summary>
+    /// specify extra http verbs in addition to the endpoint level verbs.
+    /// </summary>
+    public void AdditionalVerbs(params Http[] verbs)
+        => Verbs = [..Verbs, ..verbs.Select(m => m.ToString())];
+
+    /// <summary>
+    /// specify extra http verbs in addition to the endpoint level verbs.
+    /// </summary>
+    public void AdditionalVerbs(params string[] verbs)
+        => Verbs = [..Verbs, ..verbs];
 
     /// <summary>
     /// allows access if the claims principal has ANY of the given claim types
@@ -139,7 +152,7 @@ public sealed class EndpointDefinition(Type endpointType, Type requestDtoType, T
     {
         AllowAnyClaim = true;
         AllowedClaimTypes?.AddRange(claimTypes);
-        AllowedClaimTypes ??= new(claimTypes);
+        AllowedClaimTypes ??= [..claimTypes];
     }
 
     /// <summary>
@@ -151,7 +164,7 @@ public sealed class EndpointDefinition(Type endpointType, Type requestDtoType, T
     {
         AllowAnyClaim = false;
         AllowedClaimTypes?.AddRange(claimTypes);
-        AllowedClaimTypes ??= new(claimTypes);
+        AllowedClaimTypes ??= [..claimTypes];
     }
 
     static readonly Action<RouteHandlerBuilder> _clearDefaultAcceptsProducesMetadata
@@ -212,9 +225,7 @@ public sealed class EndpointDefinition(Type endpointType, Type requestDtoType, T
     /// enable antiforgery token verification for an endpoint
     /// </summary>
     public void EnableAntiforgery()
-    {
-        AntiforgeryEnabled = true;
-    }
+        => AntiforgeryEnabled = true;
 
     /// <summary>
     /// specify the version of the endpoint if versioning is enabled
@@ -225,6 +236,22 @@ public sealed class EndpointDefinition(Type endpointType, Type requestDtoType, T
     {
         Version.Current = version;
         Version.DeprecatedAt = deprecateAt ?? 0;
+    }
+
+    /// <summary>
+    /// if this endpoint is part of an endpoint group, specify the type of the <see cref="FastEndpoints.Group" /> concrete class where the common
+    /// configuration for the group is specified.
+    /// </summary>
+    /// <typeparam name="TEndpointGroup">the type of your <see cref="FastEndpoints.Group" /> concrete class</typeparam>
+    /// <exception cref="InvalidOperationException">thrown if endpoint route hasn't yet been specified</exception>
+    public void Group<TEndpointGroup>() where TEndpointGroup : Group, new()
+    {
+        if (Routes.Length == 0)
+        {
+            throw new InvalidOperationException(
+                $"Endpoint group can only be specified after the route has been configured in the [{EndpointType.FullName}] endpoint class!");
+        }
+        new TEndpointGroup().Action(this);
     }
 
     /// <summary>
@@ -243,7 +270,7 @@ public sealed class EndpointDefinition(Type endpointType, Type requestDtoType, T
     {
         AllowAnyPermission = true;
         AllowedPermissions?.AddRange(permissions);
-        AllowedPermissions ??= new(permissions);
+        AllowedPermissions ??= [..permissions];
     }
 
     /// <summary>
@@ -255,7 +282,7 @@ public sealed class EndpointDefinition(Type endpointType, Type requestDtoType, T
     {
         AllowAnyPermission = false;
         AllowedPermissions?.AddRange(permissions);
-        AllowedPermissions ??= new(permissions);
+        AllowedPermissions ??= [..permissions];
     }
 
     /// <summary>
@@ -275,7 +302,7 @@ public sealed class EndpointDefinition(Type endpointType, Type requestDtoType, T
     public void Policies(params string[] policyNames)
     {
         PreBuiltUserPolicies?.AddRange(policyNames);
-        PreBuiltUserPolicies ??= new(policyNames);
+        PreBuiltUserPolicies ??= [..policyNames];
     }
 
     int _postProcessorPosition;
@@ -364,7 +391,7 @@ public sealed class EndpointDefinition(Type endpointType, Type requestDtoType, T
     public void Roles(params string[] rolesNames)
     {
         AllowedRoles?.AddRange(rolesNames);
-        AllowedRoles ??= new(rolesNames);
+        AllowedRoles ??= [..rolesNames];
     }
 
     /// <summary>
@@ -414,7 +441,7 @@ public sealed class EndpointDefinition(Type endpointType, Type requestDtoType, T
     public void Tags(params string[] endpointTags)
     {
         EndpointTags?.AddRange(endpointTags);
-        EndpointTags ??= new(endpointTags);
+        EndpointTags ??= [..endpointTags];
     }
 
     /// <summary>
@@ -435,8 +462,24 @@ public sealed class EndpointDefinition(Type endpointType, Type requestDtoType, T
     /// </summary>
     /// <typeparam name="TValidator">the type of the validator</typeparam>
     public void Validator<TValidator>() where TValidator : IValidator
+        => ValidatorType = typeof(TValidator);
+
+    internal void InitAcceptsMetaData(RouteHandlerBuilder hb)
     {
-        ValidatorType = typeof(TValidator);
+        //this work is added as a convention due to: https://github.com/FastEndpoints/FastEndpoints/issues/661
+        //downside of doing this here is it's executed at startup (instead of at first request), adding a minor perf hit.
+        hb.Add(
+            b =>
+            {
+                for (var i = 0; i < b.Metadata.Count; i++)
+                {
+                    if (b.Metadata[i] is not IAcceptsMetadata meta)
+                        continue;
+
+                    AcceptsMetaDataPresent = true;
+                    AcceptsAnyContentType = meta.ContentTypes.Contains("*/*");
+                }
+            });
     }
 
     object? _mapper;

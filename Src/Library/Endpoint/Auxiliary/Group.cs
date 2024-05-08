@@ -21,7 +21,7 @@ public abstract class Group : IServiceResolverBase
     static Action<EndpointDefinition> RouteModifier(string routePrefix)
         => e =>
            {
-               if (!(e.Routes?.Length > 0))
+               if (!(e.Routes.Length > 0))
                    return;
 
                for (var i = 0; i < e.Routes.Length; i++)
@@ -84,4 +84,22 @@ public abstract class SubGroup<TParent> : Group where TParent : Group, new()
         base.Configure(routePrefix, ep);
         Action += new TParent().Action;
     }
+}
+
+interface IGroupAttribute
+{
+    void InitGroup(EndpointDefinition def);
+}
+
+/// <summary>
+/// generic attribute for designating a group that an endpoint belongs. only effective when attribute based endpoint configuration is being used.
+/// </summary>
+/// <typeparam name="TEndpointGroup">the type of the group class to use for this endpoint</typeparam>
+[AttributeUsage(AttributeTargets.Class, Inherited = false)]
+public sealed class GroupAttribute<TEndpointGroup> : Attribute, IGroupAttribute where TEndpointGroup : Group, new()
+{
+#pragma warning disable CA1822
+    void IGroupAttribute.InitGroup(EndpointDefinition def)
+        => new TEndpointGroup().Action(def);
+#pragma warning restore CA1822
 }

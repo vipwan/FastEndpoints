@@ -10,46 +10,54 @@ FastEndpoints needs sponsorship to [sustain the project](https://github.com/Fast
 
 ## New 🎉
 
-<details><summary>Specify a label, summary & description for Swagger request examples</summary>
+<details><summary>Specify additional Http Verbs/Methods for endpoints globally</summary>
 
-When specifying multiple swagger request examples, you can now specify the additional info like this:
-
-```csharp
-Summary(
-    x =>
-    {
-        x.RequestExamples.Add(
-            new(
-                new MyRequest { ... },
-                "label",
-                "summary",
-                "description"));
-    });
-```
-
-</details>
-
-## Improvements 🚀
-
-## Fixes 🪲
-
-## Breaking Changes ⚠️
-
-<details><summary>The way multiple Swagger request examples are set has been changed</summary>
-
-Previous way:
+In addition to the Verbs you specify at the endpoint level, you can now specify Verbs to be added to endpoint with the global configurator as well as endpoint groups like so:
 
 ```csharp
-Summary(s =>
+//global configurator
+app.UseFastEndpoints(
+       c => c.Endpoints.Configurator =
+                ep =>
+                {
+                    ep.AdditionalVerbs(Http.OPTIONS, Http.HEAD);
+                })
+    
+//endpoint group
+sealed class SomeGroup : Group
 {
-    s.RequestExamples.Add(new MyRequest {...});
-});
-```
-
-New way:
-
-```csharp
-s.RequestExamples.Add(new(new MyRequest { ... })); // wrapped in a RequestExample class
+    public SomeGroup()
+    {
+        Configure(
+            "prefix",
+            ep =>
+            {
+                ep.AdditionalVerbs(Http.OPTIONS, Http.HEAD);
+            });
+    }
+}
 ```
 
 </details>
+
+<details><summary>Assembly level AppFixture support</summary>
+
+todo:
+
+- write docs
+
+</details>
+
+<details><summary>Test collection fixture support</summary>
+
+todo:
+
+- write docs
+
+</details>
+
+[//]: # (## Improvements 🚀)
+
+[//]: # (## Fixes 🪲)
+
+[//]: # (## Breaking Changes ⚠️)

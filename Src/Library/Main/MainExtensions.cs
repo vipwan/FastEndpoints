@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNetCore.Antiforgery;
+﻿using System.Collections.Concurrent;
+using System.Text;
+using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -8,8 +10,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using System.Collections.Concurrent;
-using System.Text;
 using JsonOptions = Microsoft.AspNetCore.Http.Json.JsonOptions;
 
 namespace FastEndpoints;
@@ -90,9 +90,9 @@ public static class MainExtensions
             if (Cfg.EpOpts.Filter is not null && !Cfg.EpOpts.Filter(def))
                 continue;
 
-            if (def.Verbs?.Any() is not true)
+            if (def.Verbs.Length == 0)
                 throw new ArgumentException($"No HTTP Verbs declared on: [{def.EndpointType.FullName}]");
-            if (def.Routes?.Any() is not true)
+            if (def.Routes.Length == 0)
                 throw new ArgumentException($"No Routes declared on: [{def.EndpointType.FullName}]");
 
             Cfg.EpOpts.Configurator?.Invoke(def); //apply global ep settings to the definition
@@ -151,6 +151,7 @@ public static class MainExtensions
                     }
 
                     def.UserConfigAction?.Invoke(hb); //always do this last - allow user to override everything done above
+                    def.InitAcceptsMetaData(hb);      //must come after UserConfigAction
 
                     var key = $"{verb}:{finalRoute}";
                     routeToHandlerCounts.AddOrUpdate(key, 1, (_, c) => c + 1);

@@ -1,10 +1,11 @@
-﻿using Bogus;
+﻿using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
+using Bogus;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using System.Collections.Concurrent;
 using Xunit;
 using Xunit.Abstractions;
 #if NET7_0_OR_GREATER
@@ -23,7 +24,15 @@ public abstract class BaseFixture : IFaker
     /// <inheritdoc />
     public Faker Fake => _faker;
 
-    protected static readonly ConcurrentDictionary<Type, object> WafCache = new();
+    //we're using an async friendly lazy wrapper to ensure that no more than 1 waf instance is ever created per derived AppFixture type in a high concurrency situation.
+    protected static readonly ConcurrentDictionary<Type, AsyncLazy<object>> WafCache = new();
+
+    protected sealed class AsyncLazy<T>(Func<Task<T>> taskFactory)
+        : Lazy<Task<T>>(() => Task.Factory.StartNew(taskFactory).Unwrap())
+    {
+        public TaskAwaiter<T> GetAwaiter() //this signature allows this instance to be awaited directly
+            => Value.GetAwaiter();
+    }
 }
 
 /// <summary>
@@ -69,6 +78,8 @@ public abstract class AppFixture<TProgram> : BaseFixture, IAsyncLifetime where T
     }
 
     protected AppFixture() { }
+
+    // ReSharper disable VirtualMemberNeverOverridden.Global
 
     /// <summary>
     /// this will be called before the WAF is initialized. override this method if you'd like to do something before the WAF is initialized that is going to contribute to
@@ -135,18 +146,22 @@ public abstract class AppFixture<TProgram> : BaseFixture, IAsyncLifetime where T
 
     async Task IAsyncLifetime.InitializeAsync()
     {
-        await PreSetupAsync();
+        var tDerivedFixture = GetType();
 
-        _app = (WebApplicationFactory<TProgram>)
-            WafCache.GetOrAdd(
-                GetType(), //each derived fixture type  gets it's own waf/app instance. it is cached and reused.
-                WafInitializer);
+        if (tDerivedFixture.IsDefined(typeof(DisableWafCacheAttribute), true))
+            _app = (WebApplicationFactory<TProgram>)await WafInitializer();
+        else
+            _app = (WebApplicationFactory<TProgram>)await WafCache.GetOrAdd(tDerivedFixture, _ => new(WafInitializer));
+
         Client = _app.CreateClient();
 
         await SetupAsync();
 
-        object WafInitializer(Type _)
-            => new WebApplicationFactory<TProgram>().WithWebHostBuilder(
+        async Task<object> WafInitializer()
+        {
+            await PreSetupAsync();
+
+            return new WebApplicationFactory<TProgram>().WithWebHostBuilder(
                 b =>
                 {
                     b.UseEnvironment("Testing");
@@ -162,6 +177,7 @@ public abstract class AppFixture<TProgram> : BaseFixture, IAsyncLifetime where T
                     b.ConfigureTestServices(ConfigureServices);
                     ConfigureApp(b);
                 });
+        }
     }
 
     async Task IAsyncLifetime.DisposeAsync()

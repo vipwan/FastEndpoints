@@ -87,7 +87,7 @@ public abstract partial class Endpoint<TRequest, TResponse> where TRequest : not
     /// </summary>
     /// <param name="dontAutoBindFormData">
     /// set 'true' to disable auto binding of form data which enables uploading and reading of large files without buffering to memory/disk.
-    /// you can access the multipart sections for reading via the FormFileSectionsAsync() method.
+    /// you can access the multipart sections for reading via the <see cref="Endpoint{TRequest,TResponse}.FormFileSectionsAsync" /> method.
     /// </param>
     protected void AllowFileUploads(bool dontAutoBindFormData = false)
         => Definition.AllowFileUploads(dontAutoBindFormData);
@@ -231,15 +231,7 @@ public abstract partial class Endpoint<TRequest, TResponse> where TRequest : not
     /// <typeparam name="TEndpointGroup">the type of your <see cref="FastEndpoints.Group" /> concrete class</typeparam>
     /// <exception cref="InvalidOperationException">thrown if endpoint route hasn't yet been specified</exception>
     protected sealed override void Group<TEndpointGroup>()
-    {
-        if (Definition.Routes is null)
-        {
-            throw new InvalidOperationException(
-                $"Endpoint group can only be specified after the route has been configured in the [{Definition.EndpointType.FullName}] endpoint class!");
-        }
-
-        new TEndpointGroup().Action(Definition);
-    }
+        => Definition.Group<TEndpointGroup>();
 
     /// <summary>
     /// specify to listen for HEAD requests on one or more routes.
@@ -549,16 +541,14 @@ public abstract partial class Endpoint<TRequest, TResponse> where TRequest : not
     /// specify one or more http method verbs this endpoint should be accepting requests for
     /// </summary>
     protected void Verbs(params Http[] methods)
-    {
-        Verbs(methods.Select(m => m.ToString()).ToArray());
-    }
+        => Verbs(methods.Select(m => m.ToString()).ToArray());
 
     /// <summary>
     /// specify one or more http method verbs this endpoint should be accepting requests for
     /// </summary>
     public sealed override void Verbs(params string[] methods)
     {
-        //note: this method is sealed to not allow user to override it because we neeed to perform
+        //note: this method is sealed to not allow user to override it because we need to perform
         //      the following setup activities, which require access to TRequest/TResponse
 
         Definition.Verbs = methods;

@@ -3970,7 +3970,8 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "integer",
+              "format": "int32"
             }
           },
           {
@@ -5616,7 +5617,8 @@
           "PUT",
           "PATCH",
           "DELETE",
-          "HEAD"
+          "HEAD",
+          "OPTIONS"
         ],
         "enum": [
           1,
@@ -5624,7 +5626,8 @@
           3,
           4,
           5,
-          6
+          6,
+          7
         ]
       },
       "TestCasesPlainTextRequestTestResponse": {

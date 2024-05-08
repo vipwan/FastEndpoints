@@ -4,7 +4,7 @@ using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text.Json;
 using Microsoft.AspNetCore.Http;
-using TestCases.FromBodyJsonBinding;
+using TestCases.CustomRequestBinder;
 using TestCases.QueryObjectWithObjectsArrayBindingTest;
 using ByteEnum = TestCases.QueryObjectBindingTest.ByteEnum;
 using Endpoint = TestCases.JsonArrayBindingToListOfModels.Endpoint;
@@ -14,7 +14,7 @@ using Response = TestCases.RouteBindingInEpWithoutReq.Response;
 
 namespace Binding;
 
-public class BindingTests(AppFixture App) : TestBase<AppFixture>
+public class BindingTests(Sut App) : TestBase<Sut>
 {
     [Fact]
     public async Task RouteValueReadingInEndpointWithoutRequest()
@@ -784,7 +784,7 @@ public class BindingTests(AppFixture App) : TestBase<AppFixture>
     {
         var (rsp, res) = await App.CustomerClient.POSTAsync<
                              TestCases.CustomRequestBinder.Endpoint,
-                             TestCases.CustomRequestBinder.Product,
+                             Product,
                              TestCases.CustomRequestBinder.Response>(
                              new()
                              {
