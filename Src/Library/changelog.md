@@ -40,24 +40,51 @@ sealed class SomeGroup : Group
 
 </details>
 
-<details><summary>Assembly level AppFixture support</summary>
+<details><summary>Collection-Fixture support for Testing</summary>
 
-todo:
-
-- write docs
+Please the [documentation](https://fast-endpoints.com//docs/integration-unit-testing#test-collections-collection-fixtures) for details.
 
 </details>
 
-<details><summary>Test collection fixture support</summary>
+## Improvements 🚀
 
-todo:
+<details><summary>Throw meaningful exception when incorrect JWT singing algo used</summary>
 
-- write docs
+When creating Asymmetric JWTs, if the user forgets to change the default `SigningAlgorithm` from `HmacSha256` to something suitable for `Asymmetric` signing, a helpful exception message will be thrown instructing the user to correct the mistake. More info: #685
 
 </details>
 
-[//]: # (## Improvements 🚀)
+## Fixes 🪲
 
-[//]: # (## Fixes 🪲)
+<details><summary>ACL source generator wasn't filtering out internal public static fields</summary>
 
-[//]: # (## Breaking Changes ⚠️)
+Generated ACL incorrectly contained the `Descriptions` property in the permission dictionary items due to not being filtered out correctly, which has now been fixed.
+
+</details>
+
+## Minor Breaking Changes ⚠️
+
+<details><summary>Move static properties of 'ProblemDetails' class to global config</summary>
+
+Static configuration properties that used to be on the `ProblemDetails` class will have to be set from the global configuration going forward like so:
+
+```csharp
+app.UseFastEndpoints(
+   c => c.Errors.UseProblemDetails(
+       x =>
+       {
+           x.AllowDuplicateErrors = true;  //allows duplicate errors for the same error name
+           x.IndicateErrorCode = true;     //serializes the fluentvalidation error code
+           x.IndicateErrorSeverity = true; //serializes the fluentvalidation error severity
+           x.TypeValue = "https://www.rfc-editor.org/rfc/rfc7231#section-6.5.1";
+           x.TitleValue = "One or more validation errors occurred.";
+           x.TitleTransformer = pd => pd.Status switch
+           {
+               400 => "Validation Error",
+               404 => "Not Found",
+               _ => "One or more errors occurred!"
+           };
+       }));
+```
+
+</details>
