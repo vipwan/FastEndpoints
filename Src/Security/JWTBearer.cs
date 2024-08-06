@@ -4,7 +4,6 @@ using System.Text;
 using Microsoft.IdentityModel.Tokens;
 #if NET8_0_OR_GREATER
 using Microsoft.IdentityModel.JsonWebTokens;
-
 #else
 using System.IdentityModel.Tokens.Jwt;
 #endif
@@ -22,11 +21,14 @@ public static class JwtBearer
     /// <param name="options">action to configure jwt creation options.</param>
     /// <exception cref="InvalidOperationException">thrown if a token signing key is not supplied.</exception>
     public static string CreateToken(Action<JwtCreationOptions> options)
+        => CreateToken(null, options);
+
+    internal static string CreateToken(JwtCreationOptions? options = null, Action<JwtCreationOptions>? optsAction = null)
     {
         //TODO: remove all other overloads in favor of this at v6.0
 
-        var opts = new JwtCreationOptions();
-        options(opts);
+        var opts = options ?? new JwtCreationOptions();
+        optsAction?.Invoke(opts);
 
         if (string.IsNullOrEmpty(opts.SigningKey))
             throw new InvalidOperationException($"'{nameof(JwtCreationOptions.SigningKey)}' is required!");
@@ -36,13 +38,13 @@ public static class JwtBearer
 
         var claimList = new List<Claim>();
 
-        if (opts.User.Claims.Any())
+        if (opts.User.Claims.Count > 0)
             claimList.AddRange(opts.User.Claims);
 
-        if (opts.User.Permissions.Any())
+        if (opts.User.Permissions.Count > 0)
             claimList.AddRange(opts.User.Permissions.Select(p => new Claim(Conf.SecOpts.PermissionsClaimType, p)));
 
-        if (opts.User.Roles.Any())
+        if (opts.User.Roles.Count > 0)
             claimList.AddRange(opts.User.Roles.Select(r => new Claim(Conf.SecOpts.RoleClaimType, r)));
 
         var descriptor = new SecurityTokenDescriptor

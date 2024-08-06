@@ -1,8 +1,8 @@
-﻿using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
-using System.Linq.Expressions;
+﻿using System.Linq.Expressions;
 using System.Text;
 using System.Text.RegularExpressions;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using static FastEndpoints.Config;
 
 namespace FastEndpoints;
@@ -13,16 +13,19 @@ static partial class EndpointExtensions
 static class EndpointExtensions
 #endif
 {
-    internal static string ActualTypeName(this Type type)
-        => (Nullable.GetUnderlyingType(type) ?? type).Name;
-
-    internal static bool RequiresAuthorization(this EndpointDefinition ep)
+    /// <summary>
+    /// determines if a given endpoint requires authorization.
+    /// </summary>
+    public static bool RequiresAuthorization(this EndpointDefinition ep)
         => ep.AllowedPermissions?.Count > 0 ||
            ep.AllowedClaimTypes?.Count > 0 ||
            ep.AllowedRoles?.Count > 0 ||
            ep.AuthSchemeNames?.Count > 0 ||
            ep.PolicyBuilder is not null ||
            ep.PreBuiltUserPolicies is not null;
+
+    internal static string ActualTypeName(this Type type)
+        => (Nullable.GetUnderlyingType(type) ?? type).Name;
 
     internal static void Initialize(this EndpointDefinition def, BaseEndpoint instance, HttpContext? ctx)
     {
@@ -54,6 +57,11 @@ static class EndpointExtensions
 
                     case AllowAnonymousAttribute:
                         def.AllowAnonymous();
+
+                        break;
+
+                    case AllowFileUploadsAttribute fileAttr:
+                        def.AllowFileUploads(fileAttr.DontAutoBindFormData);
 
                         break;
 

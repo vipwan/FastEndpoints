@@ -1,7 +1,7 @@
+using System.Globalization;
 using FastEndpoints.Swagger;
 using NJsonSchema;
 using NSwag;
-using System.Globalization;
 using TestCases.ClientStreamingTest;
 using TestCases.CommandBusTest;
 using TestCases.CommandHandlerTest;
@@ -19,6 +19,7 @@ var bld = WebApplication.CreateBuilder(args);
 bld.AddHandlerServer();
 bld.Services
    .AddCors()
+   .AddIdempotency()
    .AddResponseCaching()
    .AddFastEndpoints(o => o.SourceGeneratorDiscoveredTypes.AddRange(DiscoveredTypes.All))
    .AddAuthenticationJwtBearer(s => s.SigningKey = bld.Configuration["TokenKey"]!)
@@ -111,9 +112,11 @@ app.UseRequestLocalization(
    .UseResponseCaching()
    .UseRouting() //if using, this call must go before auth/cors/fastendpoints middleware
    .UseCors(b => b.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod())
+   .UseJwtRevocation<JwtBlacklistChecker>()
    .UseAuthentication()
    .UseAuthorization()
    .UseAntiforgeryFE()
+   .UseOutputCache()
    .UseFastEndpoints(
        c =>
        {
@@ -169,7 +172,8 @@ app.UseJobQueues(
     {
         o.MaxConcurrency = 4;
         o.LimitsFor<JobTestCommand>(1, TimeSpan.FromSeconds(1));
-        o.StorageProbeDelay = TimeSpan.FromSeconds(5);
+        o.LimitsFor<JobCancelTestCommand>(100, TimeSpan.FromSeconds(60));
+        o.StorageProbeDelay = TimeSpan.FromMilliseconds(100);
     });
 
 var isTestHost = app.Services.CreateScope().ServiceProvider.GetService<IEmailService>() is not EmailService;

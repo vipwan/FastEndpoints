@@ -4,10 +4,12 @@ using System.Linq.Expressions;
 using System.Reflection;
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Serialization.Metadata;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Primitives;
+#if NET8_0_OR_GREATER
+using System.Text.Json.Serialization.Metadata;
 using Microsoft.Net.Http.Headers;
+#endif
 using static FastEndpoints.Config;
 
 namespace FastEndpoints;
@@ -53,7 +55,6 @@ static class BinderExtensions
         return Expression.Lambda<Action<object, object?>>(body, parent, value).Compile();
     }
 
-    //static readonly ConstructorInfo _stringSegmentCtor = Types.StringSegment.GetConstructor([Types.String])!;
     internal static readonly ConcurrentDictionary<Type, Func<object?, ParseResult>> ParserFuncCache = new();
     static readonly MethodInfo _toStringMethod = Types.Object.GetMethod("ToString")!;
     static readonly ConstructorInfo _parseResultCtor = Types.ParseResult.GetConstructor([Types.Bool, Types.Object])!;
@@ -92,14 +93,6 @@ static class BinderExtensions
                 isIParseable = tryParseMethod is not null;
             }
 
-            // var isTypedHeader = false;
-            //
-            // if (tryParseMethod is null && tProp.Name.EndsWith("HeaderValue")) //only applies to types from Microsoft.Net.Http.Headers due to tryparse having stringsegment
-            // {
-            //     tryParseMethod = tProp.GetMethod("TryParse", BindingFlags.Public | BindingFlags.Static, [Types.StringSegment, tProp.MakeByRefType()]);
-            //     isTypedHeader = tryParseMethod is not null;
-            // }
-
             if (tryParseMethod == null || tryParseMethod.ReturnType != Types.Bool)
             {
                 var interfaces = tProp.GetInterfaces();
@@ -120,14 +113,6 @@ static class BinderExtensions
                 Expression.ReferenceEqual(inputParameter, Expression.Constant(null, Types.Object)),
                 Expression.Constant(null, Types.String),
                 Expression.Call(inputParameter, _toStringMethod));
-
-            // Expression? stringSegmentCreation = null;
-            //
-            // if (isTypedHeader)
-            // {
-            //     // 'new StringSegment(input == null ? (string)null : input.ToString())'
-            //     stringSegmentCreation = Expression.New(_stringSegmentCtor, toStringConversion);
-            // }
 
             // 'res' variable used as the out parameter to the TryParse call
             var resultVar = Expression.Variable(tProp, "res");
@@ -192,15 +177,22 @@ static class BinderExtensions
                 // - ["one","two"], three, four (as StringValues)
                 // - {"name":"x"}, {"name":"y"} (as StringValues) - from swagger ui
 
-                var isEnumArray = false;
-                if (tProp.IsArray)
-                    isEnumArray = tProp.GetElementType()!.IsEnum;
+                var isEnumCollection = false;
+
+                if (Types.IEnumerable.IsAssignableFrom(tProp) &&
+                    int.TryParse(vals[0], out _)) //skip if these are not digits due to JsonStringEnumConverter
+                {
+                    if (tProp.IsArray)
+                        isEnumCollection = tProp.GetElementType()!.IsEnum;
+                    else if (tProp.IsGenericType)
+                        isEnumCollection = tProp.GetGenericArguments()[0].IsEnum;
+                }
 
                 var sb = new StringBuilder("[");
 
                 for (var i = 0; i < vals.Count; i++)
                 {
-                    if (isEnumArray || (vals[i]!.StartsWith('{') && vals[i]!.EndsWith('}')))
+                    if (isEnumCollection || (vals[i]!.StartsWith('{') && vals[i]!.EndsWith('}')))
                         sb.Append(vals[i]);
                     else
                     {

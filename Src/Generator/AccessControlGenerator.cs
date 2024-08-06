@@ -63,6 +63,8 @@ public class AccessControlGenerator : IIncrementalGenerator
             $$"""
               #nullable enable
 
+              using FastEndpoints;
+
               namespace {{_assemblyName}}.Auth;
 
               public static partial class Allow
@@ -188,6 +190,7 @@ public class AccessControlGenerator : IIncrementalGenerator
         => $$"""
              #nullable enable
 
+             using FastEndpoints;
              using System.Reflection;
 
              namespace {{assemblyName}}.Auth;

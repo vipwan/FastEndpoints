@@ -134,7 +134,7 @@ public static class HttpResponseExtensions
     public static Task SendStringAsync(this HttpResponse rsp,
                                        string content,
                                        int statusCode = 200,
-                                       string contentType = "text/plain",
+                                       string contentType = "text/plain; charset=utf-8",
                                        CancellationToken cancellation = default)
     {
         rsp.HttpContext.MarkResponseStart();
@@ -351,7 +351,7 @@ public static class HttpResponseExtensions
         rsp.HttpContext.MarkResponseStart();
         rsp.StatusCode = 200;
 
-        using (stream)
+        await using (stream)
         {
             var fileLength = fileLengthBytes;
 
@@ -390,13 +390,16 @@ public static class HttpResponseExtensions
                                                      IAsyncEnumerable<T> eventStream,
                                                      CancellationToken cancellation = default)
     {
+        long id = 0;
+        var ct = cancellation.IfDefault(rsp);
+
         rsp.HttpContext.MarkResponseStart();
         rsp.StatusCode = 200;
-        rsp.ContentType = "text/event-stream";
+        rsp.ContentType = "text/event-stream; charset=utf-8";
         rsp.Headers.CacheControl = "no-cache";
         rsp.Headers.Connection = "keep-alive";
-        var ct = cancellation.IfDefault(rsp);
-        long id = 0;
+
+        await rsp.Body.FlushAsync(ct);
 
         await foreach (var item in eventStream.WithCancellation(ct))
         {

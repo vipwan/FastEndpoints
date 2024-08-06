@@ -1,5 +1,8 @@
 ﻿namespace FastEndpoints;
 
+/// <summary>
+/// the contract for a job storage record entity
+/// </summary>
 public interface IJobStorageRecord
 {
     /// <summary>
@@ -8,25 +11,30 @@ public interface IJobStorageRecord
     string QueueID { get; set; }
 
     /// <summary>
+    /// a unique id used to track a particular job for the purpose of progress monitoring and/or termination.
+    /// </summary>
+    Guid TrackingID { get; set; }
+
+    /// <summary>
     /// the actual command object that will be embedded in the storage record.
     /// if your database/orm (such as ef-core) doesn't support embedding objects, you can take the following steps:
     /// <code>
     /// 1. add a [NotMapped] attribute to this property.
-    /// 2. add a new property, either a <see langword="string" /> or <see cref="byte" /> array
-    /// 3. implement both <see cref="GetCommand{TCommand}" /> and <see cref="SetCommand{TCommand}" /> to serialize/deserialize the command object back and forth and store it in the newly added property.
+    /// 2. add a new property, either a <c>string</c> or <c>byte[]</c>
+    /// 3. implement both GetCommand() and SetCommand() methods to serialize/deserialize the command object back and forth and store it in the newly added property.
     /// </code>
     /// you may use any serializer you please. recommendation is to use MessagePack.
     /// </summary>
     object Command { get; set; }
 
     /// <summary>
-    /// the job will not be executed before this date/time. by default it will automatically be set to the time of creation allowing jobs to be
-    /// executed as soon as they're created.
+    /// the job will not be executed before this date/time. by default, it will automatically be set to the time of creation allowing jobs to be executed as soon as they're
+    /// created.
     /// </summary>
     DateTime ExecuteAfter { get; set; }
 
     /// <summary>
-    /// the expiration date/time of job. if the job remains in an incomplete state past this time, the record is considered stale.
+    /// the expiration date/time of job. if the job remains in an incomplete state past this time, the record is considered stale, and will be marked for removal from storage.
     /// </summary>
     DateTime ExpireOn { get; set; }
 

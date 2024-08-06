@@ -134,10 +134,40 @@ public static class AuthExtensions
                 .AddCookie(
                     o =>
                     {
+                        //don't set Cookie.Expiration and Cookie.MaxAge here.
+                        //allow CookieAuthenticationHandler to take care of setting it depending on IsPersistent.
+                        //if we set it here, 'IsPersistent = false' won't have any effect.
+                        o.Cookie.Expiration = o.Cookie.MaxAge = null;
                         o.ExpireTimeSpan = validFor;
-                        o.Cookie.MaxAge = validFor;
                         o.Cookie.HttpOnly = true;
                         o.Cookie.SameSite = SameSiteMode.Lax;
+                        o.Events = new()
+                        {
+                            OnRedirectToLogin =
+                                ctx =>
+                                {
+                                    ctx.Response.Headers.Location = ctx.RedirectUri;
+                                    ctx.Response.StatusCode = 401;
+
+                                    return Task.CompletedTask;
+                                },
+                            OnRedirectToAccessDenied =
+                                ctx =>
+                                {
+                                    ctx.Response.Headers.Location = ctx.RedirectUri;
+                                    ctx.Response.StatusCode = 403;
+
+                                    return Task.CompletedTask;
+                                },
+                            OnSigningIn =
+                                ctx =>
+                                {
+                                    if (ctx.Properties.IsPersistent)
+                                        ctx.CookieOptions.MaxAge = ctx.Properties.ExpiresUtc?.UtcDateTime - DateTime.UtcNow ?? ctx.Options.ExpireTimeSpan;
+
+                                    return Task.CompletedTask;
+                                }
+                        };
                         options?.Invoke(o);
                     });
 

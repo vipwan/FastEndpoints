@@ -4,6 +4,7 @@ using Kiota.Builder;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -13,6 +14,8 @@ namespace FastEndpoints.ClientGen.Kiota;
 
 public static class Extensions
 {
+    const string TempFolder = "KiotaClientGen";
+
     /// <summary>
     /// registers an endpoint that provides a download of the api client zip file for a given client generation configuration.
     /// </summary>
@@ -29,7 +32,7 @@ public static class Extensions
             route,
             async (IHost app, HttpContext httpCtx, CancellationToken ct) =>
             {
-                var c = new ClientGenConfig { OutputPath = Path.Combine(Path.GetTempPath(), "KiotaClientGen") };
+                var c = new ClientGenConfig { OutputPath = Path.Combine(Path.GetTempPath(), TempFolder) };
                 config(c);
                 c.CreateZipArchive = true;
 
@@ -57,7 +60,7 @@ public static class Extensions
     /// <para>HINT: make sure to place the call straight after <c>app.UseFastEndpoints()</c></para>
     /// </summary>
     /// <param name="configs">client generation configurations</param>
-    public static Task GenerateApiClientsAndExitAsync(this WebApplication app, params Action<ClientGenConfig>[] configs)
+    public static Task GenerateApiClientsAndExitAsync(this IHost app, params Action<ClientGenConfig>[] configs)
         => GenerateApiClientsAndExitAsync(app, default, configs);
 
     /// <summary>
@@ -67,9 +70,9 @@ public static class Extensions
     /// </summary>
     /// <param name="ct">cancellation token</param>
     /// <param name="configs">client generation configurations</param>
-    public static async Task GenerateApiClientsAndExitAsync(this WebApplication app, CancellationToken ct, params Action<ClientGenConfig>[] configs)
+    public static async Task GenerateApiClientsAndExitAsync(this IHost app, CancellationToken ct, params Action<ClientGenConfig>[] configs)
     {
-        if (app.Configuration["generateclients"] == "true")
+        if (app.IsApiClientGenerationMode())
         {
             await app.StartAsync(ct);
 
@@ -86,19 +89,20 @@ public static class Extensions
     }
 
     /// <summary>
-    /// exports swagger.json files to disk if the application is run with the commandline argument '<c>--exportswaggerjson true</c>' and exits the program with a zero exit code.
+    /// exports a swagger.json file to disk for a given swagger document if the application is run with the commandline argument '<c>--exportswaggerjson true</c>' and exits the
+    /// program with a zero exit code.
     /// <para>HINT: make sure to place the call straight after '<c>app.UseFastEndpoints()</c>'</para>
     /// </summary>
     /// <param name="documentName">the name of the swagger document to generate the clients for</param>
     /// <param name="destinationPath">the folder path (without file name) where the client files will be saved to</param>
     /// <param name="destinationFileName">optional output file name with extension. defaults to <c>{documentName}.json</c></param>
-    public static async Task ExportSwaggerJsonAndExitAsync(this WebApplication app,
+    public static async Task ExportSwaggerJsonAndExitAsync(this IHost app,
                                                            string documentName,
                                                            string destinationPath,
                                                            string? destinationFileName = null,
                                                            CancellationToken ct = default)
     {
-        if (app.Configuration["exportswaggerjson"] == "true")
+        if (app.IsSwaggerJsonExportMode())
         {
             await app.StartAsync(ct);
             await ExportSwaggerJson(app, documentName, destinationPath, destinationFileName, ct);
@@ -106,6 +110,72 @@ public static class Extensions
             Environment.Exit(0);
         }
     }
+
+    /// <summary>
+    /// exports multiple swagger.json files to disk if the application is run with the commandline argument '<c>--exportswaggerjson true</c>' and exits the program with a zero
+    /// exit code.
+    /// <para>HINT: make sure to place the call straight after '<c>app.UseFastEndpoints()</c>'</para>
+    /// </summary>
+    /// <param name="ct">cancellation token</param>
+    /// <param name="configs">swagger doc export configurations</param>
+    public static async Task ExportSwaggerJsonAndExitAsync(this IHost app, CancellationToken ct, params Action<SwaggerJsonExportConfig>[] configs)
+    {
+        if (app.IsSwaggerJsonExportMode())
+        {
+            await app.StartAsync(ct);
+
+            foreach (var c in configs)
+            {
+                var cfg = new SwaggerJsonExportConfig();
+                c(cfg);
+                ArgumentException.ThrowIfNullOrEmpty(cfg.DocumentName);
+                ArgumentException.ThrowIfNullOrEmpty(cfg.DestinationPath);
+                await ExportSwaggerJson(app, cfg.DocumentName, cfg.DestinationPath, cfg.DestinationFileName, ct);
+            }
+            await app.StopAsync(ct);
+            Environment.Exit(0);
+        }
+    }
+
+    const string ApiClientGenerationKey = "generateclients";
+
+    /// <summary>
+    /// returns true if the app is being launched just to generate api clients.
+    /// </summary>
+    public static bool IsApiClientGenerationMode(this IHostApplicationBuilder bld)
+        => bld.Configuration[ApiClientGenerationKey] == "true";
+
+    /// <summary>
+    /// returns true if the app is being launched just to generate api clients.
+    /// </summary>
+    public static bool IsApiClientGenerationMode(this IHost app)
+        => app.Services.GetRequiredService<IConfiguration>()[ApiClientGenerationKey] == "true";
+
+    const string SwaggerJsonExportKey = "exportswaggerjson";
+
+    /// <summary>
+    /// returns true if the app is being launched just to export swagger json files.
+    /// </summary>
+    public static bool IsSwaggerJsonExportMode(this IHostApplicationBuilder bld)
+        => bld.Configuration[SwaggerJsonExportKey] == "true";
+
+    /// <summary>
+    /// returns true if the app is being launched just to export swagger json files.
+    /// </summary>
+    public static bool IsSwaggerJsonExportMode(this IHost app)
+        => app.Services.GetRequiredService<IConfiguration>()[SwaggerJsonExportKey] == "true";
+
+    /// <summary>
+    /// returns true if the app is running normally and not launched for the purpose of generating api clients and/or exporting swagger json files.
+    /// </summary>
+    public static bool IsNotGenerationMode(this IHostApplicationBuilder bld)
+        => !bld.IsApiClientGenerationMode() && !bld.IsSwaggerJsonExportMode();
+
+    /// <summary>
+    /// returns true if the app is running normally and not launched for the purpose of generating api clients and/or exporting swagger json files.
+    /// </summary>
+    public static bool IsNotGenerationMode(this IHost app)
+        => !app.IsApiClientGenerationMode() && !app.IsSwaggerJsonExportMode();
 
     static async Task<string> ExportSwaggerJson(IHost app, string documentName, string destinationPath, string? destinationFileName, CancellationToken ct)
     {
@@ -132,9 +202,17 @@ public static class Extensions
         var logger = app.Services.GetRequiredService<ILogger<ClientGenerator>>();
         logger.LogInformation("Starting [{lang}] Api Client generation for [{doc}]", c.Language.ToString(), c.SwaggerDocumentName);
 
-        c.OpenAPIFilePath = await ExportSwaggerJson(app, c.SwaggerDocumentName, c.OutputPath, null, ct);
-        var log = LoggerFactory.Create(_ => { }).CreateLogger<KiotaBuilder>();
-        await new KiotaBuilder(log, c, new()).GenerateClientAsync(ct);
+        var swaggerJsonPath = c.CleanOutput
+                                  ? Path.Combine(Path.GetTempPath(), TempFolder)
+                                  : c.OutputPath;
+
+        c.OpenAPIFilePath = await ExportSwaggerJson(app, c.SwaggerDocumentName, swaggerJsonPath, null, ct);
+
+        await new KiotaBuilder(
+                logger: LoggerFactory.Create(_ => { }).CreateLogger<KiotaBuilder>(),
+                config: c,
+                client: new())
+            .GenerateClientAsync(ct);
 
         logger.LogInformation("Api Client generation successful!");
 

@@ -25,9 +25,9 @@ public class RequestBinder<TRequest> : IRequestBinder<TRequest> where TRequest :
     static PropCache? _fromQueryParamsProp;
     static readonly Dictionary<string, PrimaryPropCacheEntry> _primaryProps = new(StringComparer.OrdinalIgnoreCase); //key: property name
     static readonly Dictionary<string, PropCache> _formFileCollectionProps = new(StringComparer.OrdinalIgnoreCase);
-    static readonly List<SecondaryPropCacheEntry> _fromClaimProps = new();
-    static readonly List<SecondaryPropCacheEntry> _fromHeaderProps = new();
-    static readonly List<SecondaryPropCacheEntry> _hasPermissionProps = new();
+    static readonly List<SecondaryPropCacheEntry> _fromClaimProps = [];
+    static readonly List<SecondaryPropCacheEntry> _fromHeaderProps = [];
+    static readonly List<SecondaryPropCacheEntry> _hasPermissionProps = [];
 
     static Func<TRequest>? _dtoInitializer;
     static Func<TRequest> InitDto => _dtoInitializer ??= CompileDtoInitializer();
@@ -267,7 +267,7 @@ public class RequestBinder<TRequest> : IRequestBinder<TRequest> where TRequest :
                 if (formFileCollections.TryGetValue(fieldName, out var fileCollection))
                     fileCollection.Add(formFile);
                 else
-                    formFileCollections[fieldName] = new() { formFile };
+                    formFileCollections[fieldName] = [formFile];
 
                 continue;
             }
@@ -428,7 +428,16 @@ public class RequestBinder<TRequest> : IRequestBinder<TRequest> where TRequest :
     {
         if (_primaryProps.TryGetValue(kvp.Key, out var prop))
         {
-            var res = prop.ValueParser(kvp.Value);
+            ParseResult res;
+
+            try
+            {
+                res = prop.ValueParser(kvp.Value);
+            }
+            catch (JsonException ex)
+            {
+                throw new JsonBindException(kvp.Key, BndOpts.FailureMessage(prop.PropType, kvp.Key, kvp.Value), ex);
+            }
 
             if (res.IsSuccess || IsNullablePropAndInputIsEmptyString(kvp, prop))
                 prop.PropSetter(req, res.Value);
@@ -540,6 +549,9 @@ public class RequestBinder<TRequest> : IRequestBinder<TRequest> where TRequest :
                    throw new NotSupportedException(
                        "Only JSON requests (with an \"application/json\" content-type header) can be deserialized to a DTO type without " +
                        $"a constructor! Offending type: [{_tRequest.FullName}]");
+
+        // if (ctor is null)
+        //     return Expression.Lambda<Func<TRequest>>(Expression.New(_tRequest)).Compile();
 
         var args = ctor.GetParameters();
         var argExpressions = new List<Expression>(args.Length);

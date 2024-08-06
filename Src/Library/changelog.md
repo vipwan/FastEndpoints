@@ -10,81 +10,30 @@ FastEndpoints needs sponsorship to [sustain the project](https://github.com/Fast
 
 ## New 🎉
 
-<details><summary>Specify additional Http Verbs/Methods for endpoints globally</summary>
+<details><summary>Multi-level test-collection ordering</summary>
 
-In addition to the Verbs you specify at the endpoint level, you can now specify Verbs to be added to endpoint with the global configurator as well as endpoint groups like so:
-
-```csharp
-//global configurator
-app.UseFastEndpoints(
-       c => c.Endpoints.Configurator =
-                ep =>
-                {
-                    ep.AdditionalVerbs(Http.OPTIONS, Http.HEAD);
-                })
-    
-//endpoint group
-sealed class SomeGroup : Group
-{
-    public SomeGroup()
-    {
-        Configure(
-            "prefix",
-            ep =>
-            {
-                ep.AdditionalVerbs(Http.OPTIONS, Http.HEAD);
-            });
-    }
-}
-```
+Tests can now be ordered by prioritizing test-collections, test-classes in those collections as well as tests within the classes for fully controlling the order of test execution when test-collections are involved. [See here](https://fast-endpoints.com/docs/integration-unit-testing#ordering-tests-in-collections) for a usage example.
 
 </details>
 
-<details><summary>Collection-Fixture support for Testing</summary>
+<details><summary>Customize character encoding of JSON responses</summary>
 
-Please the [documentation](https://fast-endpoints.com//docs/integration-unit-testing#test-collections-collection-fixtures) for details.
+A new config setting has been added to be able to customize the charset of JSON responses. `utf-8` is used by default. can be set to `null` for disabling the automatic appending of the charset to the `Content-Type` header of responses.
+
+```csharp
+app.UseFastEndpoints(c => c.Serializer.CharacterEncoding = "utf-8")
+```
 
 </details>
 
 ## Improvements 🚀
 
-<details><summary>Throw meaningful exception when incorrect JWT singing algo used</summary>
+<details><summary>Remove dependency on 'Xunit.Priority' package</summary>
 
-When creating Asymmetric JWTs, if the user forgets to change the default `SigningAlgorithm` from `HmacSha256` to something suitable for `Asymmetric` signing, a helpful exception message will be thrown instructing the user to correct the mistake. More info: #685
+The 'Xunit.Priority' package is no longer necessary as we've implemented our own test-case-orderer. If you've been using test ordering with the `[Priority(n)]` attribute, all you need to do is get rid of any `using` statements that refer to `XUnit.Priority`.
 
 </details>
 
 ## Fixes 🪲
 
-<details><summary>ACL source generator wasn't filtering out internal public static fields</summary>
-
-Generated ACL incorrectly contained the `Descriptions` property in the permission dictionary items due to not being filtered out correctly, which has now been fixed.
-
-</details>
-
 ## Minor Breaking Changes ⚠️
-
-<details><summary>Move static properties of 'ProblemDetails' class to global config</summary>
-
-Static configuration properties that used to be on the `ProblemDetails` class will have to be set from the global configuration going forward like so:
-
-```csharp
-app.UseFastEndpoints(
-   c => c.Errors.UseProblemDetails(
-       x =>
-       {
-           x.AllowDuplicateErrors = true;  //allows duplicate errors for the same error name
-           x.IndicateErrorCode = true;     //serializes the fluentvalidation error code
-           x.IndicateErrorSeverity = true; //serializes the fluentvalidation error severity
-           x.TypeValue = "https://www.rfc-editor.org/rfc/rfc7231#section-6.5.1";
-           x.TitleValue = "One or more validation errors occurred.";
-           x.TitleTransformer = pd => pd.Status switch
-           {
-               400 => "Validation Error",
-               404 => "Not Found",
-               _ => "One or more errors occurred!"
-           };
-       }));
-```
-
-</details>

@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
@@ -106,7 +106,7 @@ sealed class OperationProcessor(DocumentOptions docOpts) : IOperationProcessor
                                 example = meta.GetExampleFromMetaData() ?? example;
                                 example = example is not null ? JToken.FromObject(example, serializer) : null;
 
-                                if (ctx.Settings.SchemaSettings.SchemaType == SchemaType.Swagger2 && example is JToken { Type: JTokenType.Array } token)
+                                if (ctx.IsSwagger2() && example is JToken { Type: JTokenType.Array } token)
                                     example = token.ToString();
 
                                 return new
@@ -312,7 +312,8 @@ sealed class OperationProcessor(DocumentOptions docOpts) : IOperationProcessor
                                         if (!string.Equals(pName, m.Value, StringComparison.OrdinalIgnoreCase))
                                             return false;
 
-                                        ctx.OperationDescription.Path = ctx.OperationDescription.Path.Replace(m.Value, m.Value.ApplyPropNamingPolicy(docOpts));
+                                        //need to match complete segments including parenthesis: https://github.com/FastEndpoints/FastEndpoints/issues/709
+                                        ctx.OperationDescription.Path = opPath = opPath.Replace($"{{{m.Value}}}", $"{{{m.Value.ApplyPropNamingPolicy(docOpts)}}}");
 
                                         RemovePropFromRequestBodyContent(p.Name, reqContent, propsToRemoveFromExample, docOpts);
 
@@ -383,7 +384,7 @@ sealed class OperationProcessor(DocumentOptions docOpts) : IOperationProcessor
         }
 
         //fix IFormFile props in OAS2 - remove from request body and add as a request param
-        if (ctx.Settings.SchemaSettings.SchemaType == SchemaType.Swagger2 && reqDtoProps is not null)
+        if (ctx.IsSwagger2() && reqDtoProps is not null)
         {
             foreach (var p in reqDtoProps.ToArray())
             {
@@ -395,6 +396,21 @@ sealed class OperationProcessor(DocumentOptions docOpts) : IOperationProcessor
                 reqParams.Add(CreateParam(paramCtx, OpenApiParameterKind.FormData, p));
             }
         }
+
+    #if NET7_0_OR_GREATER
+
+        //add idempotency header param if applicable
+        if (epDef.IdempotencyOptions is not null)
+        {
+            var prm = CreateParam(paramCtx, OpenApiParameterKind.Header, null, epDef.IdempotencyOptions.HeaderName, true);
+            prm.Example = epDef.IdempotencyOptions.SwaggerExampleGenerator?.Invoke();
+            prm.Description = epDef.IdempotencyOptions.SwaggerHeaderDescription;
+            if (epDef.IdempotencyOptions.SwaggerHeaderType is not null)
+                prm.Schema = JsonSchema.FromType(epDef.IdempotencyOptions.SwaggerHeaderType);
+            reqParams.Add(prm);
+        }
+
+    #endif
 
         foreach (var p in reqParams)
         {
@@ -633,9 +649,35 @@ sealed class OperationProcessor(DocumentOptions docOpts) : IOperationProcessor
                          !hasDefaultValFromCtorArg ??
                          !(isNullable ?? true);
 
+        if (ctx.OpCtx.IsSwagger2() && prm.Schema is null)
+        {
+            prm.Schema = JsonSchema.FromType(propType);
+            prm.Schema.Title = null;
+        }
+
+        //fix enums not rendering as dropdowns in swagger ui due to nswag bug
+        if (isNullable is true && Nullable.GetUnderlyingType(propType)?.IsEnum is true && prm.Schema.OneOf.Count == 1)
+        {
+            prm.Schema.AllOf.Add(prm.Schema.OneOf.Single());
+            prm.Schema.OneOf.Clear();
+        }
+        else if (propType.IsEnum && prm.Schema.Reference?.IsEnumeration is true)
+        {
+            prm.Schema.AllOf.Add(new() { Reference = prm.Schema.ActualSchema });
+            prm.Schema.Reference = null;
+        }
+
         prm.Schema.IsNullableRaw = prm.IsRequired ? null : isNullable;
 
-        if (ctx.OpCtx.Settings.SchemaSettings.SchemaType == SchemaType.Swagger2)
+        if (Kind == OpenApiParameterKind.Body &&
+            prm.Schema.OneOf.SingleOrDefault()?.Reference?.IsObject is true &&
+            prm.Schema.OneOf.Single().Reference?.Discriminator is null)
+        {
+            prm.Schema = prm.Schema.OneOf.Single();
+            prm.Schema.OneOf.Clear();
+        }
+
+        if (ctx.OpCtx.IsSwagger2())
             prm.Default = Prop?.GetCustomAttribute<DefaultValueAttribute>()?.Value ?? defaultValFromCtorArg;
         else
             prm.Schema.Default = Prop?.GetCustomAttribute<DefaultValueAttribute>()?.Value ?? defaultValFromCtorArg;
@@ -656,7 +698,7 @@ sealed class OperationProcessor(DocumentOptions docOpts) : IOperationProcessor
         return prm;
     }
 
-    readonly struct ParamCreationContext
+    internal readonly struct ParamCreationContext
     {
         public OperationProcessorContext OpCtx { get; }
         public DocumentOptions DocOpts { get; }
@@ -664,6 +706,9 @@ sealed class OperationProcessor(DocumentOptions docOpts) : IOperationProcessor
         public Dictionary<string, string>? Descriptions { get; }
 
         readonly Dictionary<string, Type> _paramMap;
+
+        //search min 1 `:` character between any `{` and `}` characters
+        const string ParamMapPattern = @"\{[^{}]*:[^{}]*\}";
 
         public ParamCreationContext(OperationProcessorContext opCtx,
                                     DocumentOptions docOpts,
@@ -677,20 +722,18 @@ sealed class OperationProcessor(DocumentOptions docOpts) : IOperationProcessor
             Descriptions = descriptions;
             _paramMap = new(
                 operationPath.Split('/')
-                             .Where(s => s.Contains('{') && s.Contains(':') && s.Contains('}'))
+                             .Where(s => Regex.IsMatch(s, ParamMapPattern)) //include: api/{id:int:min(5)}:deactivate
                              .Select(
                                  s =>
                                  {
-                                     var parts = s.Split(':');
-                                     var left = parts[0];
-                                     var right = parts[1];
+                                     var withoutBraces = s[(s.IndexOf('{') + 1)..s.IndexOfAny(['(', '}'])];
+                                     var parts = withoutBraces.Split(':');
+                                     var name = parts[0].Trim();
+                                     var type = parts[1].Trim();
 
-                                     left = left[(left.IndexOf('{') + 1)..].Trim();
-                                     right = right[..right.IndexOfAny(['(', '}'])].Trim();
+                                     GlobalConfig.RouteConstraintMap.TryGetValue(type, out var tParam);
 
-                                     GlobalConfig.RouteConstraintMap.TryGetValue(right, out var tParam);
-
-                                     return new KeyValuePair<string, Type>(left, tParam ?? Types.String);
+                                     return new KeyValuePair<string, Type>(name, tParam ?? Types.String);
                                  }));
         }
 

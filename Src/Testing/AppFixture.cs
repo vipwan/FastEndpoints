@@ -1,10 +1,11 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using Bogus;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Xunit;
 using Xunit.Abstractions;
@@ -103,6 +104,17 @@ public abstract class AppFixture<TProgram> : BaseFixture, IAsyncLifetime where T
         => Task.CompletedTask;
 
     /// <summary>
+    /// override this method if you'd like to provide any configuration for the generic app host of the underlying <see cref="WebApplicationFactory{TEntryPoint}" />
+    /// </summary>
+    protected virtual IHost ConfigureAppHost(IHostBuilder a)
+    {
+        var host = a.Build();
+        host.Start();
+
+        return host;
+    }
+
+    /// <summary>
     /// override this method if you'd like to provide any configuration for the web host of the underlying <see cref="WebApplicationFactory{TEntryPoint}" />
     /// />
     /// </summary>
@@ -117,7 +129,7 @@ public abstract class AppFixture<TProgram> : BaseFixture, IAsyncLifetime where T
     /// create a client for the underlying web application
     /// </summary>
     /// <param name="o">optional client options for the WAF</param>
-    public HttpClient CreateClient(WebApplicationFactoryClientOptions? o = null)
+    public HttpClient CreateClient(ClientOptions? o = null)
         => CreateClient(_ => { }, o);
 
     /// <summary>
@@ -125,9 +137,10 @@ public abstract class AppFixture<TProgram> : BaseFixture, IAsyncLifetime where T
     /// </summary>
     /// <param name="c">configuration action for the client</param>
     /// <param name="o">optional client options for the WAF</param>
-    public HttpClient CreateClient(Action<HttpClient> c, WebApplicationFactoryClientOptions? o = null)
+    public HttpClient CreateClient(Action<HttpClient> c, ClientOptions? o = null)
     {
-        var client = o is null ? _app.CreateClient() : _app.CreateClient(o);
+        o ??= new();
+        var client = _app.CreateDefaultClient(o.BaseAddress, o.CreateHandlers());
         c(client);
 
         return client;
@@ -161,7 +174,7 @@ public abstract class AppFixture<TProgram> : BaseFixture, IAsyncLifetime where T
         {
             await PreSetupAsync();
 
-            return new WebApplicationFactory<TProgram>().WithWebHostBuilder(
+            return new WafWrapper(ConfigureAppHost).WithWebHostBuilder(
                 b =>
                 {
                     b.UseEnvironment("Testing");
@@ -186,6 +199,12 @@ public abstract class AppFixture<TProgram> : BaseFixture, IAsyncLifetime where T
 
         // ReSharper disable once ConditionalAccessQualifierIsNonNullableAccordingToAPIContract
         Client?.Dispose();
+    }
+
+    class WafWrapper(Func<IHostBuilder, IHost> configureAppHost) : WebApplicationFactory<TProgram>
+    {
+        protected override IHost CreateHost(IHostBuilder builder)
+            => configureAppHost(builder);
     }
 }
 

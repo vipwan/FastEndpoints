@@ -1,5 +1,5 @@
 {
-  "x-generator": "NSwag v14.0.7.0 (NJsonSchema v11.0.0.0 (Newtonsoft.Json v13.0.0.0))",
+  "x-generator": "NSwag v14.1.0.0 (NJsonSchema v11.0.2.0 (Newtonsoft.Json v13.0.0.0))",
   "openapi": "3.0.0",
   "info": {
     "title": "Web API",
@@ -2177,11 +2177,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "oneOf": [
-                  {
-                    "$ref": "#/components/schemas/TestCasesFromBodyJsonBindingProduct"
-                  }
-                ]
+                "$ref": "#/components/schemas/TestCasesFromBodyJsonBindingProduct"
               },
               "example": {
                 "Id": 0,
@@ -2773,6 +2769,52 @@
             "ApiKey": []
           }
         ]
+      }
+    },
+    "/api/test-cases/idempotency/{id}": {
+      "get": {
+        "tags": [
+          "TestCases"
+        ],
+        "operationId": "TestCasesIdempotencyEndpoint",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Content",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestCasesIdempotencyResponse"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/test-cases/json-array-binding-for-ienumerable-props": {
@@ -3585,7 +3627,11 @@
             "in": "query",
             "required": true,
             "schema": {
-              "$ref": "#/components/schemas/SystemDayOfWeek"
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/SystemDayOfWeek"
+                }
+              ]
             }
           },
           {
@@ -5344,6 +5390,23 @@
         }
       },
       "TestCasesHydratedTestUrlGeneratorTestRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "TestCasesIdempotencyResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "Id": {
+            "type": "string"
+          },
+          "Ticks": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "TestCasesIdempotencyRequest": {
         "type": "object",
         "additionalProperties": false
       },

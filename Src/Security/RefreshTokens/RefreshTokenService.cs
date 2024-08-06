@@ -1,5 +1,7 @@
 ﻿// ReSharper disable MemberCanBeProtected.Global
 
+using System.Diagnostics.CodeAnalysis;
+
 namespace FastEndpoints.Security;
 
 /// <summary>
@@ -36,7 +38,7 @@ public abstract class RefreshTokenService<TRequest, TResponse> : Endpoint<TReque
     {
         await RefreshRequestValidationAsync(req);
         ThrowIfAnyErrors();
-        var res = await ((IRefreshTokenService<TResponse>)this).CreateToken(req.UserId, null, req);
+        var res = await ((IRefreshTokenService<TResponse>)this).CreateToken(req.UserId, null, true, req);
         await SendAsync(res, 200, ct);
     }
 
@@ -49,6 +51,44 @@ public abstract class RefreshTokenService<TRequest, TResponse> : Endpoint<TReque
         _opts = new();
         options(_opts);
     }
+
+    /// <summary>
+    /// a hook for modifying jwt creation options per request when a login request comes in. this method is called right before the actual jwt token is created allowing you to
+    /// override token creation parameters per request if needed.
+    /// </summary>
+    /// <param name="jwtOptions">jwt token creation options which you can modify per request</param>
+    /// <param name="request">the request dto. maybe null unless you supply it to the <see cref="Endpoint{TRequest,TResponse}.CreateTokenWith{TService}" /> method.</param>
+    [SuppressMessage("ReSharper", "UnusedParameter.Global")]
+    public virtual Task OnBeforeInitialTokenCreationAsync(JwtCreationOptions jwtOptions, object? request)
+        => Task.CompletedTask;
+
+    /// <summary>
+    /// a hook for modifying the created token response when a login request comes in.
+    /// </summary>
+    /// <param name="request">the request dto. maybe null unless you supply it to the <see cref="Endpoint{TRequest,TResponse}.CreateTokenWith{TService}" /> method.</param>
+    /// <param name="response">the token response dto that is created</param>
+    [SuppressMessage("ReSharper", "UnusedParameter.Global")]
+    public virtual Task OnAfterInitialTokenCreationAsync(object? request, TResponse response)
+        => Task.CompletedTask;
+
+    /// <summary>
+    /// a hook for modifying jwt creation options per request when a renewal request comes in. this method is called right before the actual jwt token is created allowing you to
+    /// override token creation parameters per request if needed.
+    /// </summary>
+    /// <param name="jwtOptions">jwt token creation options which you can modify per request</param>
+    /// <param name="request">the request dto. maybe null unless you supply it to the <see cref="Endpoint{TRequest,TResponse}.CreateTokenWith{TService}" /> method.</param>
+    [SuppressMessage("ReSharper", "UnusedParameter.Global")]
+    public virtual Task OnBeforeRenewalTokenCreationAsync(JwtCreationOptions jwtOptions, TRequest? request)
+        => Task.CompletedTask;
+
+    /// <summary>
+    /// a hook for modifying the created token response when a renewal request comes in.
+    /// </summary>
+    /// <param name="request">the request dto. maybe null unless you supply it to the <see cref="Endpoint{TRequest,TResponse}.CreateTokenWith{TService}" /> method.</param>
+    /// <param name="response">the token response dto that is created</param>
+    [SuppressMessage("ReSharper", "UnusedParameter.Global")]
+    public virtual Task OnAfterRenewalTokenCreationAsync(TRequest? request, TResponse response)
+        => Task.CompletedTask;
 
     /// <summary>
     /// this method will be called whenever a new access/refresh token pair is being generated.
@@ -67,7 +107,7 @@ public abstract class RefreshTokenService<TRequest, TResponse> : Endpoint<TReque
     public abstract Task RefreshRequestValidationAsync(TRequest req);
 
     /// <summary>
-    /// specify the user privileges to be embeded in the jwt when a refresh request is received and validation has passed.
+    /// specify the user privileges to be embedded in the jwt when a refresh request is received and validation has passed.
     /// this only applies to renewal/refresh requests received to the refresh endpoint and not the initial jwt creation.
     /// </summary>
     /// <param name="request">the request dto received from the client</param>
@@ -79,17 +119,19 @@ public abstract class RefreshTokenService<TRequest, TResponse> : Endpoint<TReque
     /// </summary>
     /// <typeparam name="T">the type to map to</typeparam>
     /// <param name="userId">the id of the user to create the token for</param>
-    /// <param name="privileges">the user priviledges to be embeded in the jwt such as roles/claims/permissions</param>
+    /// <param name="privileges">the user privileges to be embedded in the jwt such as roles/claims/permissions</param>
     /// <param name="map">a func that maps properties from <typeparamref name="TResponse" /> to <typeparamref name="T" /></param>
-    public async Task<T> CreateCustomToken<T>(string userId, Action<UserPrivileges> privileges, Func<TResponse, T> map)
+    /// <param name="isRenewal">specify if this is an initial login request or a renewal/refresh request</param>
+    /// <param name="request">the request dto</param>
+    public async Task<T> CreateCustomToken<T>(string userId, Action<UserPrivileges> privileges, Func<TResponse, T> map, bool isRenewal = false, object? request = null)
     {
-        var res = await ((IRefreshTokenService<TResponse>)this).CreateToken(userId, privileges, null);
+        var res = await ((IRefreshTokenService<TResponse>)this).CreateToken(userId, privileges, isRenewal, request);
 
         return map(res);
     }
 
     [HideFromDocs]
-    async Task<TResponse> IRefreshTokenService<TResponse>.CreateToken(string userId, Action<UserPrivileges>? privileges, object? request)
+    async Task<TResponse> IRefreshTokenService<TResponse>.CreateToken(string userId, Action<UserPrivileges>? privileges, bool isRenewal, object? request)
     {
         if (_opts?.TokenSigningKey is null)
             throw new ArgumentNullException($"{nameof(_opts.TokenSigningKey)} must be specified for [{Definition.EndpointType.FullName}]");
@@ -98,37 +140,62 @@ public abstract class RefreshTokenService<TRequest, TResponse> : Endpoint<TReque
 
         privileges?.Invoke(privs);
 
-        if (request is not null) //only true on renewal
+        if (isRenewal && request is not null)
             await SetRenewalPrivilegesAsync((TRequest)request, privs);
 
         var time = Conf.ServiceResolver.TryResolve<TimeProvider>() ?? TimeProvider.System;
         var accessExpiry = time.GetUtcNow().Add(_opts.AccessTokenValidity).UtcDateTime;
         var refreshExpiry = time.GetUtcNow().Add(_opts.RefreshTokenValidity).UtcDateTime;
-        var token = new TResponse
+        var jOpts = new JwtCreationOptions
+        {
+            SigningKey = _opts.TokenSigningKey,
+            SigningStyle = _opts.TokenSigningStyle,
+            SigningAlgorithm = _opts.TokenSigningAlgorithm,
+            KeyIsPemEncoded = _opts.SigningKeyIsPemEncoded,
+            ExpireAt = accessExpiry,
+            Issuer = _opts.Issuer,
+            Audience = _opts.Audience,
+            CompressionAlgorithm = _opts.TokenCompressionAlgorithm
+        };
+        jOpts.User.Permissions.AddRange(privs.Permissions);
+        jOpts.User.Roles.AddRange(privs.Roles);
+        jOpts.User.Claims.AddRange(privs.Claims);
+
+        switch (isRenewal)
+        {
+            case false:
+                await OnBeforeInitialTokenCreationAsync(jOpts, request);
+
+                break;
+            case true:
+                await OnBeforeRenewalTokenCreationAsync(jOpts, request as TRequest);
+
+                break;
+        }
+
+        var tokenResponse = new TResponse
         {
             UserId = userId,
-            AccessToken = JwtBearer.CreateToken(
-                o =>
-                {
-                    o.SigningKey = _opts.TokenSigningKey;
-                    o.SigningStyle = _opts.TokenSigningStyle;
-                    o.SigningAlgorithm = _opts.TokenSigningAlgorithm;
-                    o.KeyIsPemEncoded = _opts.SigningKeyIsPemEncoded;
-                    o.ExpireAt = accessExpiry;
-                    o.User.Permissions.AddRange(privs.Permissions);
-                    o.User.Roles.AddRange(privs.Roles);
-                    o.User.Claims.AddRange(privs.Claims);
-                    o.Issuer = _opts.Issuer;
-                    o.Audience = _opts.Audience;
-                    o.CompressionAlgorithm = _opts.TokenCompressionAlgorithm;
-                }),
+            AccessToken = JwtBearer.CreateToken(jOpts),
             AccessExpiry = accessExpiry,
             RefreshToken = Guid.NewGuid().ToString("N"),
             RefreshExpiry = refreshExpiry
         };
 
-        await PersistTokenAsync(token);
+        switch (isRenewal)
+        {
+            case false:
+                await OnAfterInitialTokenCreationAsync(request, tokenResponse);
 
-        return token;
+                break;
+            case true:
+                await OnAfterRenewalTokenCreationAsync(request as TRequest, tokenResponse);
+
+                break;
+        }
+
+        await PersistTokenAsync(tokenResponse);
+
+        return tokenResponse;
     }
 }
