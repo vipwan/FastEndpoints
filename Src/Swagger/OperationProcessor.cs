@@ -16,6 +16,7 @@ using NSwag;
 using NSwag.Generation.AspNetCore;
 using NSwag.Generation.Processors;
 using NSwag.Generation.Processors.Contexts;
+using JsonIgnoreAttribute = System.Text.Json.Serialization.JsonIgnoreAttribute;
 
 namespace FastEndpoints.Swagger;
 
@@ -52,7 +53,10 @@ sealed class OperationProcessor(DocumentOptions docOpts) : IOperationProcessor
             return true; //this is not a fastendpoint
 
         var apiDescription = ((AspNetCoreOperationProcessorContext)ctx).ApiDescription;
-        var opPath = ctx.OperationDescription.Path = $"/{StripRouteConstraints(apiDescription.RelativePath!)}"; //fix missing path parameters
+
+        //fix missing path parameters
+        var opPath = ctx.OperationDescription.Path = $"/{StripRouteConstraints(apiDescription.RelativePath!.TrimStart('~').TrimEnd('/'))}";
+
         var apiVer = epDef.Version.Current;
         var version = $"/{GlobalConfig.VersioningPrefix ?? "v"}{apiVer}";
         var routePrefix = "/" + (GlobalConfig.EndpointRoutePrefix ?? "_");
@@ -70,9 +74,19 @@ sealed class OperationProcessor(DocumentOptions docOpts) : IOperationProcessor
         //set operation tag
         if (docOpts.AutoTagPathSegmentIndex > 0 && !epDef.DontAutoTagEndpoints)
         {
-            var segments = bareRoute.Split('/').Where(s => s != string.Empty).ToArray();
-            if (segments.Length >= docOpts.AutoTagPathSegmentIndex)
-                op.Tags.Add(TagName(segments[docOpts.AutoTagPathSegmentIndex - 1], docOpts.TagCase, docOpts.TagStripSymbols));
+            var overrideVal = metaData.OfType<AutoTagOverride>().SingleOrDefault()?.TagName;
+            string? tag = null;
+
+            if (overrideVal is not null)
+                tag = TagName(overrideVal, docOpts.TagCase, docOpts.TagStripSymbols);
+            else
+            {
+                var segments = bareRoute.Split('/').Where(s => s != string.Empty).ToArray();
+                if (segments.Length >= docOpts.AutoTagPathSegmentIndex)
+                    tag = TagName(segments[docOpts.AutoTagPathSegmentIndex - 1], docOpts.TagCase, docOpts.TagStripSymbols);
+            }
+            if (tag is not null)
+                op.Tags.Add(tag);
         }
 
         //this will be later removed from document processor. this info is needed by the document processor.
@@ -92,6 +106,7 @@ sealed class OperationProcessor(DocumentOptions docOpts) : IOperationProcessor
 
         //fix response content-types not displaying correctly
         //also set user provided response examples and response headers
+        //and fix polymorphism for responses when using oneOf
         if (op.Responses.Count > 0)
         {
             var metas = metaData
@@ -115,13 +130,39 @@ sealed class OperationProcessor(DocumentOptions docOpts) : IOperationProcessor
                                     cTypes = meta.ContentTypes,
                                     example,
                                     usrHeaders = epDef.EndpointSummary?.ResponseHeaders.Where(h => h.StatusCode == k).ToArray(),
-                                    tDto = meta.Type
+                                    tDto = meta.Type,
+                                    isIResult = Types.IResult.IsAssignableFrom(meta.Type) //todo: remove when .net 9 sdk bug is fixed
                                 };
                             })
                         .ToDictionary(x => x.key);
 
             if (metas.Count > 0)
             {
+            #if NET9_0_OR_GREATER
+
+                //remove this workaround when sdk bug is fixed: https://github.com/dotnet/aspnetcore/issues/57801#issuecomment-2439578287
+                foreach (var meta in metas.Where(m => m.Value.isIResult))
+                {
+                    var res = new OpenApiResponse { Content = { [meta.Value.cTypes.First()] = new() { Schema = new() } } };
+
+                    if (!ctx.SchemaResolver.HasSchema(meta.Value.tDto!, false))
+                    {
+                        var schema = ctx.SchemaGenerator.Generate(meta.Value.tDto!, ctx.SchemaResolver);
+                        ctx.SchemaResolver.AppendSchema(schema, schema.Title);
+                        res.Schema.Reference = schema;
+                    }
+                    else
+                        res.Schema.Reference = ctx.SchemaResolver.GetSchema(meta.Value.tDto!, false);
+
+                    op.Responses[meta.Key] = res;
+                    var orderedResponses = op.Responses.OrderBy(kvp => kvp.Key).ToArray();
+                    op.Responses.Clear();
+
+                    foreach (var rsp in orderedResponses)
+                        op.Responses.Add(rsp);
+                }
+            #endif
+
                 foreach (var rsp in op.Responses)
                 {
                     var cTypes = metas[rsp.Key].cTypes;
@@ -147,7 +188,7 @@ sealed class OperationProcessor(DocumentOptions docOpts) : IOperationProcessor
                             };
                         }
 
-                        if (x.usrHeaders?.Any() is true)
+                        if (x.usrHeaders?.Length > 0)
                         {
                             foreach (var hdr in x.usrHeaders)
                             {
@@ -164,6 +205,21 @@ sealed class OperationProcessor(DocumentOptions docOpts) : IOperationProcessor
                     rsp.Value.Content.Clear();
                     foreach (var ct in cTypes)
                         rsp.Value.Content.Add(new(ct, mediaType));
+
+                    if (docOpts.UseOneOfForPolymorphism)
+                    {
+                        foreach (var mt in rsp.Value.Content)
+                        {
+                            if (mt.Value.Schema.ActualSchema.DiscriminatorObject?.Mapping.Count > 0 &&
+                                mt.Value.Schema.ActualSchema.OneOf.Count > 0)
+                            {
+                                foreach (var derived in mt.Value.Schema.ActualSchema.OneOf)
+                                    mt.Value.Schema.OneOf.Add(derived);
+
+                                mt.Value.Schema.Reference = null;
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -227,7 +283,8 @@ sealed class OperationProcessor(DocumentOptions docOpts) : IOperationProcessor
         if (GlobalConfig.IsUsingAspVersioning)
         {
             //because asp-versioning adds the version route segment as a path parameter
-            foreach (var prm in apiDescription.ParameterDescriptions.ToArray().Where(p => p.Source != Microsoft.AspNetCore.Mvc.ModelBinding.BindingSource.Body))
+            foreach (var prm in apiDescription.ParameterDescriptions.ToArray()
+                                              .Where(p => p.Source != Microsoft.AspNetCore.Mvc.ModelBinding.BindingSource.Body))
                 apiDescription.ParameterDescriptions.Remove(prm);
         }
 
@@ -286,10 +343,10 @@ sealed class OperationProcessor(DocumentOptions docOpts) : IOperationProcessor
         if (reqDtoProps != null)
         {
             foreach (var p in reqDtoProps.Where(
-                                             p => p.IsDefined(Types.JsonIgnoreAttribute) ||
+                                             p => p.GetCustomAttribute<JsonIgnoreAttribute>()?.Condition == JsonIgnoreCondition.Always ||
                                                   p.IsDefined(Types.HideFromDocsAttribute) ||
                                                   p.GetSetMethod()?.IsPublic is not true)
-                                         .ToArray()) //prop has no public setter or has ignore/hide attribute
+                                         .ToArray())
             {
                 RemovePropFromRequestBodyContent(p.Name, reqContent, propsToRemoveFromExample, docOpts);
                 reqDtoProps.Remove(p);
@@ -312,8 +369,11 @@ sealed class OperationProcessor(DocumentOptions docOpts) : IOperationProcessor
                                         if (!string.Equals(pName, m.Value, StringComparison.OrdinalIgnoreCase))
                                             return false;
 
-                                        //need to match complete segments including parenthesis: https://github.com/FastEndpoints/FastEndpoints/issues/709
-                                        ctx.OperationDescription.Path = opPath = opPath.Replace($"{{{m.Value}}}", $"{{{m.Value.ApplyPropNamingPolicy(docOpts)}}}");
+                                        //need to match complete segments including parenthesis:
+                                        //https://github.com/FastEndpoints/FastEndpoints/issues/709
+                                        ctx.OperationDescription.Path = opPath = opPath.Replace(
+                                                                            $"{{{m.Value}}}",
+                                                                            $"{{{m.Value.ApplyPropNamingPolicy(docOpts)}}}");
 
                                         RemovePropFromRequestBodyContent(p.Name, reqContent, propsToRemoveFromExample, docOpts);
 
@@ -328,7 +388,12 @@ sealed class OperationProcessor(DocumentOptions docOpts) : IOperationProcessor
         if (reqDtoType is not null)
         {
             var qParams = reqDtoProps?
-                          .Where(p => ShouldAddQueryParam(p, reqParams, isGetRequest && !docOpts.EnableGetRequestsWithBody, docOpts)) //user wants body in GET requests
+                          .Where(
+                              p => ShouldAddQueryParam(
+                                  p,
+                                  reqParams,
+                                  isGetRequest && !docOpts.EnableGetRequestsWithBody,
+                                  docOpts)) //user wants body in GET requests
                           .Select(
                               p =>
                               {
@@ -450,14 +515,52 @@ sealed class OperationProcessor(DocumentOptions docOpts) : IOperationProcessor
         }
 
         //replace body parameter if a dto property is marked with [FromBody]
-        var fromBodyProp = reqDtoProps?.Where(p => p.IsDefined(typeof(FromBodyAttribute), false)).FirstOrDefault();
+        var fromBodyProp = reqDtoProps?.Where(p => p.IsDefined(Types.FromBodyAttribute, false)).FirstOrDefault();
 
         if (fromBodyProp is not null)
         {
-            foreach (var body in op.Parameters.Where(x => x.Kind == OpenApiParameterKind.Body).ToArray())
+            var body = op.Parameters.FirstOrDefault(x => x.Kind == OpenApiParameterKind.Body);
+
+            if (body is not null && op.RequestBody is not null)
             {
-                op.Parameters.Remove(body);
-                op.Parameters.Add(CreateParam(paramCtx, OpenApiParameterKind.Body, fromBodyProp, fromBodyProp.Name, true));
+                var oldBodyName = op.RequestBody.Name;
+                var bodyParam = CreateParam(paramCtx, OpenApiParameterKind.Body, fromBodyProp, fromBodyProp.Name, true);
+
+                //otherwise xml docs from properties won't be considered due to existence of a schema level example generated from
+                //prm.ActualSchema.ToSampleJson()
+                bodyParam.Example = null;
+
+                op.RequestBody.Content.FirstOrDefault().Value.Schema = bodyParam.Schema;
+                op.RequestBody.IsRequired = bodyParam.IsRequired;
+                op.RequestBody.Description = bodyParam.Description;
+                op.RequestBody.Name = bodyParam.Name;
+                op.RequestBody.Position = null;
+                ctx.Document.Components.Schemas.Remove(oldBodyName);
+            }
+        }
+
+        //replace body parameter if a dto property is marked with [FromForm]
+        var fromFormProp = reqDtoProps?.Where(p => p.IsDefined(Types.FromFormAttribute, false)).FirstOrDefault();
+
+        if (fromFormProp is not null)
+        {
+            var body = op.Parameters.FirstOrDefault(x => x.Kind == OpenApiParameterKind.Body);
+
+            if (body is not null && op.RequestBody is not null)
+            {
+                var oldBodyName = op.RequestBody.Name;
+                var bodyParam = CreateParam(paramCtx, OpenApiParameterKind.Body, fromFormProp, fromFormProp.Name, true);
+
+                //otherwise xml docs from properties won't be considered due to existence of a schema level example generated from
+                //prm.ActualSchema.ToSampleJson()
+                bodyParam.Example = null;
+
+                op.RequestBody.Content.FirstOrDefault().Value.Schema = bodyParam.Schema;
+                op.RequestBody.IsRequired = bodyParam.IsRequired;
+                op.RequestBody.Description = bodyParam.Description;
+                op.RequestBody.Name = bodyParam.Name;
+                op.RequestBody.Position = null;
+                ctx.Document.Components.Schemas.Remove(oldBodyName);
             }
         }
 
@@ -525,9 +628,9 @@ sealed class OperationProcessor(DocumentOptions docOpts) : IOperationProcessor
         return true;
     }
 
-    static bool ShouldAddQueryParam(PropertyInfo prop, List<OpenApiParameter> reqParams, bool isGetRequest, DocumentOptions doctops)
+    static bool ShouldAddQueryParam(PropertyInfo prop, List<OpenApiParameter> reqParams, bool isGetRequest, DocumentOptions docOpts)
     {
-        var paramName = prop.Name.ApplyPropNamingPolicy(doctops);
+        var paramName = prop.Name.ApplyPropNamingPolicy(docOpts);
 
         foreach (var attribute in prop.GetCustomAttributes())
         {
@@ -582,8 +685,10 @@ sealed class OperationProcessor(DocumentOptions docOpts) : IOperationProcessor
                 return;
 
             schema.Properties.Remove(key);
-            schema.RequiredProperties
-                  .Remove(key); //because validation schema processor may have added this prop/key, which should be removed when the prop is being removed from the schema
+
+            //because validation schema processor may have added this prop/key, which should be removed when the prop is being removed from the schema
+            schema.RequiredProperties.Remove(key);
+
             foreach (var s in schema.AllOf.Union(schema.AllInheritedSchemas))
                 Remove(s, key);
         }
@@ -614,7 +719,11 @@ sealed class OperationProcessor(DocumentOptions docOpts) : IOperationProcessor
             => stripSymbols ? Regex.Replace(val, "[^a-zA-Z0-9]", "") : val;
     }
 
-    static OpenApiParameter CreateParam(ParamCreationContext ctx, OpenApiParameterKind Kind, PropertyInfo? Prop = null, string? ParamName = null, bool? IsRequired = null)
+    static OpenApiParameter CreateParam(ParamCreationContext ctx,
+                                        OpenApiParameterKind Kind,
+                                        PropertyInfo? Prop = null,
+                                        string? ParamName = null,
+                                        bool? IsRequired = null)
     {
         ParamName = ParamName?.ApplyPropNamingPolicy(ctx.DocOpts) ??
                     Prop?.GetCustomAttribute<BindFromAttribute>()?.Name ?? //don't apply naming policy to attribute value

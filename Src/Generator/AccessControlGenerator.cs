@@ -11,6 +11,7 @@ namespace FastEndpoints.Generator;
 [Generator(LanguageNames.CSharp)]
 public class AccessControlGenerator : IIncrementalGenerator
 {
+    const string AccessControl = "AccessControl";
     static string? _assemblyName;
 
     // ReSharper disable once InconsistentNaming
@@ -19,19 +20,24 @@ public class AccessControlGenerator : IIncrementalGenerator
     public void Initialize(IncrementalGeneratorInitializationContext ctx)
     {
         var assemblyName = ctx.CompilationProvider.Select(static (c, _) => c.AssemblyName);
-        ctx.RegisterSourceOutput(assemblyName, static (spc, assembly) => spc.AddSource("Allow.b.g.cs", SourceText.From(RenderBase(assembly), Encoding.UTF8)));
+        ctx.RegisterSourceOutput(
+            assemblyName,
+            static (spc, assembly) => spc.AddSource("Allow.b.g.cs", SourceText.From(RenderBase(assembly), Encoding.UTF8)));
 
         var matches = ctx.SyntaxProvider
                          .CreateSyntaxProvider(Qualify, Transform)
                          .Where(static m => m.Endpoint is not null)
-                         .WithComparer(new Comparer())
+                         .WithComparer(MatchComparer.Instance)
                          .Collect();
 
         ctx.RegisterSourceOutput(matches, Generate);
 
         //executed per each keystroke
         static bool Qualify(SyntaxNode node, CancellationToken _)
-            => node is InvocationExpressionSyntax { ArgumentList.Arguments.Count: not 0, Expression: IdentifierNameSyntax { Identifier.ValueText: "AccessControl" } };
+            => node is InvocationExpressionSyntax
+            {
+                ArgumentList.Arguments.Count: not 0, Expression: IdentifierNameSyntax { Identifier.ValueText: AccessControl }
+            };
 
         //executed per each keystroke but only for syntax nodes filtered by the Qualify method
         static Match Transform(GeneratorSyntaxContext ctx, CancellationToken _)
@@ -323,7 +329,8 @@ public class AccessControlGenerator : IIncrementalGenerator
                         .OfType<LiteralExpressionSyntax>()
                         .Select(l => l.Token.ValueText.Sanitize());
 
-            var desc = m.Invocation.ArgumentList.OpenParenToken.TrailingTrivia.SingleOrDefault(t => t.IsKind(SyntaxKind.SingleLineCommentTrivia)).ToString();
+            var desc = m.Invocation.ArgumentList.OpenParenToken.TrailingTrivia.SingleOrDefault(t => t.IsKind(SyntaxKind.SingleLineCommentTrivia))
+                        .ToString();
 
             Name = args.First();
             Code = GetAclHash(Name);
@@ -349,8 +356,12 @@ public class AccessControlGenerator : IIncrementalGenerator
         public InvocationExpressionSyntax Invocation { get; } = invocation;
     }
 
-    class Comparer : IEqualityComparer<Match>
+    class MatchComparer : IEqualityComparer<Match>
     {
+        internal static MatchComparer Instance { get; } = new();
+
+        MatchComparer() { }
+
         public bool Equals(Match x, Match y)
             => x.Endpoint!.ToDisplayString().Equals(y.Endpoint!.ToDisplayString()) &&
                x.Invocation.IsEquivalentTo(y.Invocation);

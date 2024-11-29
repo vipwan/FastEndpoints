@@ -1,12 +1,14 @@
-﻿using FastEndpoints;
+﻿using System.Text.Json.Serialization;
+using FastEndpoints;
 using FluentValidation;
-using System.Text.Json.Serialization;
 
 namespace FEBench;
 
-[JsonSerializable(typeof(CodeGenRequest))]
-[JsonSerializable(typeof(CodeGenResponse))]
-public partial class SerializerCtx : JsonSerializerContext { }
+[
+    JsonSerializable(typeof(CodeGenRequest)),
+    JsonSerializable(typeof(CodeGenResponse))
+]
+public partial class SerializerCtx : JsonSerializerContext;
 
 public class CodeGenRequest
 {
@@ -54,17 +56,15 @@ public class CodeGenEndpoint : Endpoint<CodeGenRequest, CodeGenResponse>
     }
 
     public override Task HandleAsync(CodeGenRequest req, CancellationToken ct)
-    {
+
         //Logger.LogInformation("request received!");
-
         //validator is automatically being run by FastEndpoints
-
-        return SendAsync(new CodeGenResponse()
-        {
-            Id = req.Id,
-            Name = req.FirstName + " " + req.LastName,
-            Age = req.Age,
-            PhoneNumber = req.PhoneNumbers?.FirstOrDefault()
-        });
-    }
+        => SendAsync(
+            new()
+            {
+                Id = req.Id,
+                Name = req.FirstName + " " + req.LastName,
+                Age = req.Age,
+                PhoneNumber = req.PhoneNumbers?.FirstOrDefault()
+            });
 }

@@ -1,5 +1,5 @@
 {
-  "x-generator": "NSwag v14.1.0.0 (NJsonSchema v11.0.2.0 (Newtonsoft.Json v13.0.0.0))",
+  "x-generator": "NSwag v14.2.0.0 (NJsonSchema v11.1.0.0 (Newtonsoft.Json v13.0.0.0))",
   "openapi": "3.0.0",
   "info": {
     "title": "Web API",
@@ -169,16 +169,8 @@
           "x-position": 1
         },
         "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "text/plain": {
-                "schema": {}
-              },
-              "application/json": {
-                "schema": {}
-              }
-            }
+          "204": {
+            "description": "No Content"
           },
           "401": {
             "description": "Unauthorized"
@@ -245,16 +237,8 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "text/plain": {
-                "schema": {}
-              },
-              "application/json": {
-                "schema": {}
-              }
-            }
+          "204": {
+            "description": "No Content"
           },
           "401": {
             "description": "Unauthorized"
@@ -298,16 +282,8 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "text/plain": {
-                "schema": {}
-              },
-              "application/json": {
-                "schema": {}
-              }
-            }
+          "204": {
+            "description": "No Content"
           },
           "401": {
             "description": "Unauthorized"
@@ -373,16 +349,8 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "text/plain": {
-                "schema": {}
-              },
-              "application/json": {
-                "schema": {}
-              }
-            }
+          "204": {
+            "description": "No Content"
           },
           "401": {
             "description": "Unauthorized"
@@ -408,16 +376,8 @@
         ],
         "operationId": "PostCustomersCreateEndpoint3",
         "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "text/plain": {
-                "schema": {}
-              },
-              "application/json": {
-                "schema": {}
-              }
-            }
+          "204": {
+            "description": "No Content"
           },
           "401": {
             "description": "Unauthorized"
@@ -475,16 +435,8 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "text/plain": {
-                "schema": {}
-              },
-              "application/json": {
-                "schema": {}
-              }
-            }
+          "204": {
+            "description": "No Content"
           },
           "401": {
             "description": "Unauthorized"
@@ -541,16 +493,8 @@
           "x-position": 1
         },
         "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "text/plain": {
-                "schema": {}
-              },
-              "application/json": {
-                "schema": {}
-              }
-            }
+          "204": {
+            "description": "No Content"
           },
           "401": {
             "description": "Unauthorized"
@@ -604,16 +548,8 @@
           "x-position": 1
         },
         "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "text/plain": {
-                "schema": {}
-              },
-              "application/json": {
-                "schema": {}
-              }
-            }
+          "204": {
+            "description": "No Content"
           },
           "401": {
             "description": "Unauthorized"
@@ -680,16 +616,8 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "text/plain": {
-                "schema": {}
-              },
-              "application/json": {
-                "schema": {}
-              }
-            }
+          "204": {
+            "description": "No Content"
           },
           "401": {
             "description": "Unauthorized"
@@ -733,16 +661,8 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "text/plain": {
-                "schema": {}
-              },
-              "application/json": {
-                "schema": {}
-              }
-            }
+          "204": {
+            "description": "No Content"
           },
           "401": {
             "description": "Unauthorized"
@@ -808,16 +728,8 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "text/plain": {
-                "schema": {}
-              },
-              "application/json": {
-                "schema": {}
-              }
-            }
+          "204": {
+            "description": "No Content"
           },
           "401": {
             "description": "Unauthorized"
@@ -843,16 +755,8 @@
         ],
         "operationId": "PostCustomersCreateWithPropertiesDIEndpoint3",
         "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "text/plain": {
-                "schema": {}
-              },
-              "application/json": {
-                "schema": {}
-              }
-            }
+          "204": {
+            "description": "No Content"
           },
           "401": {
             "description": "Unauthorized"
@@ -910,16 +814,8 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "text/plain": {
-                "schema": {}
-              },
-              "application/json": {
-                "schema": {}
-              }
-            }
+          "204": {
+            "description": "No Content"
           },
           "401": {
             "description": "Unauthorized"
@@ -945,6 +841,15 @@
         ],
         "operationId": "CustomersListRecentEndpoint_V1",
         "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
           "200": {
             "description": "Success",
             "content": {
@@ -954,12 +859,6 @@
                 }
               }
             }
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
           }
         },
         "security": [
@@ -979,16 +878,8 @@
         ],
         "operationId": "CustomersLoginEndpoint",
         "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "text/plain": {
-                "schema": {}
-              },
-              "application/json": {
-                "schema": {}
-              }
-            }
+          "204": {
+            "description": "No Content"
           }
         }
       }
@@ -1033,16 +924,8 @@
           "x-position": 1
         },
         "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "text/plain": {
-                "schema": {}
-              },
-              "application/json": {
-                "schema": {}
-              }
-            }
+          "204": {
+            "description": "No Content"
           },
           "401": {
             "description": "Unauthorized"
@@ -1100,16 +983,8 @@
           "x-position": 1
         },
         "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "text/plain": {
-                "schema": {}
-              },
-              "application/json": {
-                "schema": {}
-              }
-            }
+          "204": {
+            "description": "No Content"
           },
           "401": {
             "description": "Unauthorized"
@@ -1277,16 +1152,8 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "text/plain": {
-                "schema": {}
-              },
-              "application/json": {
-                "schema": {}
-              }
-            }
+          "204": {
+            "description": "No Content"
           },
           "403": {
             "description": "Forbidden"
@@ -1314,22 +1181,8 @@
           "x-position": 1
         },
         "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "text/plain": {
-                "schema": {}
-              },
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
+          "204": {
+            "description": "No Content"
           },
           "400": {
             "description": "Bad Request",
@@ -1340,6 +1193,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
           }
         },
         "security": [
@@ -1414,12 +1273,6 @@
               }
             }
           },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
           "400": {
             "description": "Bad Request",
             "content": {
@@ -1429,6 +1282,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
           }
         },
         "security": [
@@ -1491,12 +1350,6 @@
               }
             }
           },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
           "400": {
             "description": "Bad Request",
             "content": {
@@ -1506,6 +1359,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
           }
         },
         "security": [
@@ -1594,16 +1453,8 @@
         ],
         "operationId": "antiforgery_TestCasesAntiforgeryTestRenderFormHtml",
         "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "text/plain": {
-                "schema": {}
-              },
-              "application/json": {
-                "schema": {}
-              }
-            }
+          "204": {
+            "description": "No Content"
           }
         }
       }
@@ -1883,16 +1734,8 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "text/plain": {
-                "schema": {}
-              },
-              "application/json": {
-                "schema": {}
-              }
-            }
+          "204": {
+            "description": "No Content"
           }
         }
       }
@@ -2045,20 +1888,8 @@
         ],
         "operationId": "TestCasesEmptyRequestTestEmptyRequestEndpoint",
         "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsEmptyResponse"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsEmptyResponse"
-                }
-              }
-            }
+          "204": {
+            "description": "No Content"
           },
           "401": {
             "description": "Unauthorized"
@@ -2098,6 +1929,30 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/test-cases/form-binding-complex-dtos": {
+      "post": {
+        "tags": [
+          "TestCases"
+        ],
+        "operationId": "TestCasesFormBindingComplexDtosEndpoint",
+        "requestBody": {
+          "x-name": "Book",
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/TestCasesFormBindingComplexDtosBook"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
           }
         }
       }
@@ -2178,11 +2033,6 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/TestCasesFromBodyJsonBindingProduct"
-              },
-              "example": {
-                "Id": 0,
-                "Name": "Name",
-                "Price": 200.1
               }
             }
           },
@@ -2817,6 +2667,42 @@
         }
       }
     },
+    "/api/test-cases/included-validator": {
+      "post": {
+        "tags": [
+          "TestCases"
+        ],
+        "operationId": "TestCasesIncludedValidatorTestEndpoint",
+        "requestBody": {
+          "x-name": "Request",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TestCasesIncludedValidatorTestRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/test-cases/json-array-binding-for-ienumerable-props": {
       "get": {
         "tags": [
@@ -3090,16 +2976,8 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "text/plain": {
-                "schema": {}
-              },
-              "application/json": {
-                "schema": {}
-              }
-            }
+          "204": {
+            "description": "No Content"
           },
           "401": {
             "description": "Unauthorized"
@@ -3122,16 +3000,8 @@
         ],
         "operationId": "TestCasesMissingClaimTestThrowIfMissingEndpoint",
         "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "text/plain": {
-                "schema": {}
-              },
-              "application/json": {
-                "schema": {}
-              }
-            }
+          "204": {
+            "description": "No Content"
           },
           "401": {
             "description": "Unauthorized"
@@ -3177,16 +3047,8 @@
           "x-position": 1
         },
         "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "text/plain": {
-                "schema": {}
-              },
-              "application/json": {
-                "schema": {}
-              }
-            }
+          "204": {
+            "description": "No Content"
           },
           "401": {
             "description": "Unauthorized"
@@ -3219,16 +3081,8 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "text/plain": {
-                "schema": {}
-              },
-              "application/json": {
-                "schema": {}
-              }
-            }
+          "204": {
+            "description": "No Content"
           },
           "401": {
             "description": "Unauthorized"
@@ -3274,9 +3128,6 @@
               }
             }
           },
-          "401": {
-            "description": "Unauthorized"
-          },
           "400": {
             "description": "Bad Request",
             "content": {
@@ -3286,6 +3137,9 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         },
         "security": [
@@ -3392,16 +3246,8 @@
         ],
         "operationId": "TestCasesPostProcessorTestEpNoPostProcessor",
         "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "text/plain": {
-                "schema": {}
-              },
-              "application/json": {
-                "schema": {}
-              }
-            }
+          "204": {
+            "description": "No Content"
           }
         }
       }
@@ -3424,16 +3270,8 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "text/plain": {
-                "schema": {}
-              },
-              "application/json": {
-                "schema": {}
-              }
-            }
+          "204": {
+            "description": "No Content"
           },
           "400": {
             "description": "Bad Request",
@@ -3478,9 +3316,6 @@
               }
             }
           },
-          "401": {
-            "description": "Unauthorized"
-          },
           "400": {
             "description": "Bad Request",
             "content": {
@@ -3490,6 +3325,9 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         },
         "security": [
@@ -3783,16 +3621,8 @@
         ],
         "operationId": "TestCasesRangeHandlingTestEndpoint",
         "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "text/plain": {
-                "schema": {}
-              },
-              "application/json": {
-                "schema": {}
-              }
-            }
+          "204": {
+            "description": "No Content"
           },
           "206": {
             "description": "",
@@ -4058,6 +3888,66 @@
         }
       }
     },
+    "/api/test-cases/routing/user/{UserId}": {
+      "post": {
+        "tags": [
+          "TestCases"
+        ],
+        "operationId": "TestCasesRoutingNonOptionalRouteParamTest",
+        "parameters": [
+          {
+            "name": "UserId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/test-cases/routing/offer/{OfferId}": {
+      "post": {
+        "tags": [
+          "TestCases"
+        ],
+        "operationId": "TestCasesRoutingOptionalRouteParamTest",
+        "parameters": [
+          {
+            "name": "OfferId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/test-cases/service-reg-gen-test": {
       "get": {
         "tags": [
@@ -4184,9 +4074,6 @@
               }
             }
           },
-          "404": {
-            "description": "Not Found"
-          },
           "400": {
             "description": "Bad Request",
             "content": {
@@ -4196,6 +4083,9 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "Not Found"
           }
         }
       }
@@ -4252,16 +4142,8 @@
           "x-position": 1
         },
         "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "text/plain": {
-                "schema": {}
-              },
-              "application/json": {
-                "schema": {}
-              }
-            }
+          "204": {
+            "description": "No Content"
           },
           "401": {
             "description": "Unauthorized"
@@ -4297,16 +4179,8 @@
           "x-position": 1
         },
         "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "text/plain": {
-                "schema": {}
-              },
-              "application/json": {
-                "schema": {}
-              }
-            }
+          "204": {
+            "description": "No Content"
           },
           "401": {
             "description": "Unauthorized"
@@ -4342,16 +4216,8 @@
           "x-position": 1
         },
         "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "text/plain": {
-                "schema": {}
-              },
-              "application/json": {
-                "schema": {}
-              }
-            }
+          "204": {
+            "description": "No Content"
           },
           "401": {
             "description": "Unauthorized"
@@ -4387,16 +4253,8 @@
           "x-position": 1
         },
         "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "text/plain": {
-                "schema": {}
-              },
-              "application/json": {
-                "schema": {}
-              }
-            }
+          "204": {
+            "description": "No Content"
           },
           "401": {
             "description": "Unauthorized"
@@ -4432,16 +4290,8 @@
           "x-position": 1
         },
         "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "text/plain": {
-                "schema": {}
-              },
-              "application/json": {
-                "schema": {}
-              }
-            }
+          "204": {
+            "description": "No Content"
           },
           "401": {
             "description": "Unauthorized"
@@ -4477,19 +4327,8 @@
           "x-position": 1
         },
         "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "text/plain": {
-                "schema": {}
-              },
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden"
+          "204": {
+            "description": "No Content"
           },
           "400": {
             "description": "Bad Request",
@@ -4500,6 +4339,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Forbidden"
           }
         }
       },
@@ -4522,19 +4364,8 @@
           "x-position": 1
         },
         "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "text/plain": {
-                "schema": {}
-              },
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden"
+          "204": {
+            "description": "No Content"
           },
           "400": {
             "description": "Bad Request",
@@ -4545,6 +4376,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Forbidden"
           }
         },
         "security": [
@@ -4592,19 +4426,6 @@
               }
             }
           },
-          "403": {
-            "description": "Forbidden"
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
-                }
-              }
-            }
-          },
           "204": {
             "description": "No Content",
             "content": {
@@ -4619,6 +4440,19 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden"
           }
         }
       },
@@ -4656,19 +4490,6 @@
               }
             }
           },
-          "403": {
-            "description": "Forbidden"
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
-                }
-              }
-            }
-          },
           "204": {
             "description": "No Content",
             "content": {
@@ -4683,6 +4504,19 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden"
           }
         },
         "security": [
@@ -4937,34 +4771,6 @@
         "type": "object",
         "additionalProperties": false
       },
-      "FastEndpointsErrorResponse": {
-        "type": "object",
-        "description": "the dto used to send an error response to the client",
-        "additionalProperties": false,
-        "properties": {
-          "StatusCode": {
-            "type": "integer",
-            "description": "the http status code sent to the client. default is 400.",
-            "format": "int32",
-            "default": 400
-          },
-          "Message": {
-            "type": "string",
-            "description": "the message for the error response",
-            "default": "One or more errors occurred!"
-          },
-          "Errors": {
-            "type": "object",
-            "description": "the collection of errors for the current context",
-            "additionalProperties": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            }
-          }
-        }
-      },
       "InventoryManageUpdateRequest": {
         "type": "object",
         "additionalProperties": false,
@@ -5003,6 +4809,34 @@
             "type": "string",
             "minLength": 1,
             "nullable": false
+          }
+        }
+      },
+      "FastEndpointsErrorResponse": {
+        "type": "object",
+        "description": "the dto used to send an error response to the client",
+        "additionalProperties": false,
+        "properties": {
+          "StatusCode": {
+            "type": "integer",
+            "description": "the http status code sent to the client. default is 400.",
+            "format": "int32",
+            "default": 400
+          },
+          "Message": {
+            "type": "string",
+            "description": "the message for the error response",
+            "default": "One or more errors occurred!"
+          },
+          "Errors": {
+            "type": "object",
+            "description": "the collection of errors for the current context",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
           }
         }
       },
@@ -5243,10 +5077,93 @@
           }
         }
       },
-      "FastEndpointsEmptyResponse": {
+      "TestCasesFormBindingComplexDtosRequest": {
         "type": "object",
-        "description": "a response dto that doesn't have any properties",
-        "additionalProperties": false
+        "additionalProperties": false,
+        "properties": {
+          "Book": {
+            "$ref": "#/components/schemas/TestCasesFormBindingComplexDtosBook"
+          }
+        }
+      },
+      "TestCasesFormBindingComplexDtosBook": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "Title": {
+            "type": "string"
+          },
+          "CoverImage": {
+            "type": "string",
+            "format": "binary"
+          },
+          "SourceFiles": {
+            "type": "array",
+            "items": {}
+          },
+          "MainAuthor": {
+            "$ref": "#/components/schemas/TestCasesFormBindingComplexDtosAuthor"
+          },
+          "CoAuthors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TestCasesFormBindingComplexDtosAuthor"
+            }
+          },
+          "BarCodes": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        }
+      },
+      "TestCasesFormBindingComplexDtosAuthor": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "Name": {
+            "type": "string"
+          },
+          "ProfileImage": {
+            "type": "string",
+            "format": "binary"
+          },
+          "DocumentFiles": {
+            "type": "array",
+            "items": {}
+          },
+          "MainAddress": {
+            "$ref": "#/components/schemas/TestCasesFormBindingComplexDtosAddress"
+          },
+          "OtherAddresses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TestCasesFormBindingComplexDtosAddress"
+            }
+          }
+        }
+      },
+      "TestCasesFormBindingComplexDtosAddress": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "Street": {
+            "type": "string"
+          },
+          "MainImage": {
+            "type": "string",
+            "format": "binary"
+          },
+          "AlternativeImages": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "binary"
+            }
+          }
+        }
       },
       "TestCasesFormFileBindingTestResponse": {
         "type": "object",
@@ -5409,6 +5326,45 @@
       "TestCasesIdempotencyRequest": {
         "type": "object",
         "additionalProperties": false
+      },
+      "TestCasesIncludedValidatorTestRequest": {
+        "required": [
+          "Name"
+        ],
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/TestCasesIncludedValidatorTestBaseRequest"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "Name": {
+                "type": "string",
+                "minLength": 5,
+                "nullable": false
+              }
+            }
+          }
+        ]
+      },
+      "TestCasesIncludedValidatorTestBaseRequest": {
+        "type": "object",
+        "x-abstract": true,
+        "additionalProperties": false,
+        "required": [
+          "Id"
+        ],
+        "properties": {
+          "Id": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 5.0,
+            "minLength": 1,
+            "nullable": false,
+            "exclusiveMinimum": true
+          }
+        }
       },
       "TestCasesJsonArrayBindingForIEnumerablePropsResponse": {
         "allOf": [
@@ -6140,6 +6096,14 @@
           }
         }
       },
+      "TestCasesRoutingNonOptionalRouteParamTest_Request": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "TestCasesRoutingOptionalRouteParamTest_Request": {
+        "type": "object",
+        "additionalProperties": false
+      },
       "TestCasesSTJInfiniteRecursionTestResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -6174,6 +6138,16 @@
         "additionalProperties": false,
         "properties": {
           "RequestId": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "TestCasesTypedResultTestRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "Id": {
             "type": "integer",
             "format": "int32"
           }
@@ -6242,16 +6216,6 @@
             "type": "string",
             "description": "the severity of the error",
             "nullable": true
-          }
-        }
-      },
-      "TestCasesTypedResultTestRequest": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "Id": {
-            "type": "integer",
-            "format": "int32"
           }
         }
       },
@@ -6388,6 +6352,16 @@
           "File2": {
             "type": "string",
             "format": "binary"
+          },
+          "File3": {
+            "type": "string",
+            "format": "binary",
+            "nullable": true
+          },
+          "File4": {
+            "type": "string",
+            "format": "binary",
+            "nullable": true
           },
           "Cars": {
             "type": "array",

@@ -3,68 +3,62 @@ using Microsoft.AspNetCore.Http;
 
 namespace FastEndpoints;
 
-sealed class AntiforgeryMiddleware
+sealed class AntiforgeryMiddleware(RequestDelegate next, IAntiforgery antiforgery)
 {
     internal static bool IsRegistered { get; set; }
-
-    readonly RequestDelegate _next;
-    readonly IAntiforgery _antiforgery;
+    internal static Func<HttpContext, bool>? SkipFilter { private get; set; }
+    internal static string[] AdditionalContentTypes { private get; set; } = [];
 
     const string UrlEncodedFormContentType = "application/x-www-form-urlencoded";
     const string MultipartFormContentType = "multipart/form-data";
 
-    public AntiforgeryMiddleware(RequestDelegate next, IAntiforgery antiforgery)
+    public async Task Invoke(HttpContext ctx)
     {
-        _next = next;
-        _antiforgery = antiforgery;
-    }
-
-    public async Task Invoke(HttpContext context)
-    {
-        if (context.Request.Method == HttpMethods.Get ||
-            context.Request.Method == HttpMethods.Trace ||
-            context.Request.Method == HttpMethods.Options ||
-            context.Request.Method == HttpMethods.Head)
+        if (ctx.Request.Method == HttpMethods.Get ||
+            ctx.Request.Method == HttpMethods.Trace ||
+            ctx.Request.Method == HttpMethods.Options ||
+            ctx.Request.Method == HttpMethods.Head ||
+            SkipFilter?.Invoke(ctx) is true)
         {
-            await _next(context);
+            await next(ctx);
 
             return;
         }
 
-        var contentType = context.Request.ContentType;
+        var contentType = ctx.Request.ContentType;
 
         if (string.IsNullOrEmpty(contentType))
         {
-            await _next(context);
+            await next(ctx);
 
             return;
         }
 
         if (contentType.Equals(UrlEncodedFormContentType, StringComparison.OrdinalIgnoreCase) ||
-            contentType.StartsWith(MultipartFormContentType, StringComparison.OrdinalIgnoreCase))
+            contentType.StartsWith(MultipartFormContentType, StringComparison.OrdinalIgnoreCase) ||
+            AdditionalContentTypes.Contains(contentType, StringComparer.OrdinalIgnoreCase))
         {
-            var endpointDefinition = context.GetEndpoint()?.Metadata.GetMetadata<EndpointDefinition>();
+            var endpointDefinition = ctx.GetEndpoint()?.Metadata.GetMetadata<EndpointDefinition>();
 
             if (endpointDefinition?.AntiforgeryEnabled is true)
             {
                 try
                 {
-                    await _antiforgery.ValidateRequestAsync(context);
+                    await antiforgery.ValidateRequestAsync(ctx);
                 }
                 catch (AntiforgeryValidationException)
                 {
-                    await context.Response.SendErrorsAsync(
-                        new()
-                        {
-                            new(
-                                propertyName: Cfg.ErrOpts.GeneralErrorsField,
-                                errorMessage: "Anti-forgery token is invalid!")
-                        });
+                    await ctx.Response.SendErrorsAsync(
+                    [
+                        new(
+                            propertyName: Cfg.ErrOpts.GeneralErrorsField,
+                            errorMessage: "Anti-forgery token is invalid!")
+                    ]);
 
                     return;
                 }
             }
         }
-        await _next(context);
+        await next(ctx);
     }
 }

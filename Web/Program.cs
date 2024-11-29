@@ -21,7 +21,7 @@ bld.Services
    .AddCors()
    .AddIdempotency()
    .AddResponseCaching()
-   .AddFastEndpoints(o => o.SourceGeneratorDiscoveredTypes.AddRange(DiscoveredTypes.All))
+   .AddFastEndpoints(o => o.SourceGeneratorDiscoveredTypes = DiscoveredTypes.All)
    .AddAuthenticationJwtBearer(s => s.SigningKey = bld.Configuration["TokenKey"]!)
    .AddAuthorization(o => o.AddPolicy("AdminOnly", b => b.RequireRole(Role.Admin)))
    .AddKeyedTransient<IKeyedService>("AAA", (_, _) => new MyKeyedService("AAA"))
@@ -115,7 +115,7 @@ app.UseRequestLocalization(
    .UseJwtRevocation<JwtBlacklistChecker>()
    .UseAuthentication()
    .UseAuthorization()
-   .UseAntiforgeryFE()
+   .UseAntiforgeryFE(additionalContentTypes: ["application/json"])
    .UseOutputCache()
    .UseFastEndpoints(
        c =>
@@ -123,12 +123,13 @@ app.UseRequestLocalization(
            c.Validation.EnableDataAnnotationsSupport = true;
            c.Serializer.Options.PropertyNamingPolicy = null;
 
+           c.Binding.ReflectionCache.AddFromWeb();
            c.Binding.ValueParserFor<Guid>(x => new(Guid.TryParse(x?.ToString(), out var res), res));
 
            c.Endpoints.RoutePrefix = "api";
            c.Endpoints.ShortNames = false;
            c.Endpoints.PrefixNameWithFirstTag = true;
-           c.Endpoints.Filter = ep => ep.EndpointTags?.Contains("exclude") is not true;
+           c.Endpoints.Filter = (EndpointDefinition ep) => ep.EndpointTags?.Contains("exclude") is not true;
            c.Endpoints.Configurator =
                ep =>
                {

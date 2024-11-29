@@ -36,4 +36,7 @@ static class ReflectionExtensions
 
         return null;
     }
+
+    internal static Type GetUnderlyingType(this Type type)
+        => Nullable.GetUnderlyingType(type) ?? type;
 }

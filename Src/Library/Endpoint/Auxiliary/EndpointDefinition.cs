@@ -23,6 +23,8 @@ public sealed class EndpointDefinition(Type endpointType, Type requestDtoType, T
     //these can only be set from internal code but accessible for user
     public Type EndpointType { get; init; } = endpointType;
     public Type? MapperType { get; internal set; }
+    public IEnumerable<IPreProcessor> PreProcessorsList => PreProcessorList.Cast<IPreProcessor>();
+    public IEnumerable<IPostProcessor> PostProcessorsList => PostProcessorList.Cast<IPostProcessor>();
     public Type ReqDtoType { get; init; } = requestDtoType;
     public Type ResDtoType { get; init; } = responseDtoType;
     public string[] Routes { get; internal set; } = [];
@@ -60,6 +62,8 @@ public sealed class EndpointDefinition(Type endpointType, Type requestDtoType, T
     internal bool AcceptsAnyContentType;
     internal bool AcceptsMetaDataPresent;
     internal List<object>? AttribsToForward;
+    internal readonly bool Disposable = endpointType.IsAssignableTo(typeof(IDisposable));
+    internal readonly bool DisposableAsync = endpointType.IsAssignableTo(typeof(IAsyncDisposable));
     internal bool ExecuteAsyncImplemented;
     bool? _execReturnsIResults;
     internal bool ExecuteAsyncReturnsIResult => _execReturnsIResults ??= ResDtoType.IsAssignableTo(Types.IResult);
@@ -67,9 +71,9 @@ public sealed class EndpointDefinition(Type endpointType, Type requestDtoType, T
     internal HitCounter? HitCounter { get; private set; }
     internal Action<RouteHandlerBuilder> InternalConfigAction = null!;
     internal bool ImplementsConfigure;
-    internal readonly List<object> PreProcessorList = [];
+    internal readonly List<IProcessor> PreProcessorList = [];
     internal int PreProcessorPosition;
-    internal readonly List<object> PostProcessorList = [];
+    internal readonly List<IProcessor> PostProcessorList = [];
     internal object? RequestBinder;
     string? _reqDtoFromBodyPropName;
     internal string ReqDtoFromBodyPropName => _reqDtoFromBodyPropName ??= GetFromBodyPropName();
@@ -517,11 +521,11 @@ public sealed class EndpointDefinition(Type endpointType, Type requestDtoType, T
         return _validator;
     }
 
-    internal static void AddProcessor<TProcessor>(Order order, IList<object> list, ref int pos)
+    internal static void AddProcessor<TProcessor>(Order order, IList<IProcessor> list, ref int pos)
     {
         try
         {
-            var processor = Cfg.ServiceResolver.CreateSingleton(typeof(TProcessor));
+            var processor = (IProcessor)Cfg.ServiceResolver.CreateSingleton(typeof(TProcessor));
             AddProcessor(order, processor, list, ref pos);
         }
         catch (Exception ex)
@@ -530,13 +534,13 @@ public sealed class EndpointDefinition(Type endpointType, Type requestDtoType, T
         }
     }
 
-    internal static void AddProcessors(Order order, IReadOnlyList<object> processors, IList<object> list, ref int pos)
+    internal static void AddProcessors(Order order, IReadOnlyList<IProcessor> processors, IList<IProcessor> list, ref int pos)
     {
         for (var i = 0; i < processors.Count; i++)
             AddProcessor(order, processors[i], list, ref pos);
     }
 
-    static void AddProcessor(Order order, object processor, IList<object> list, ref int pos)
+    static void AddProcessor(Order order, IProcessor processor, IList<IProcessor> list, ref int pos)
     {
         if (list.Contains(processor, TypeEqualityComparer.Instance))
             return;
@@ -551,15 +555,11 @@ public sealed class EndpointDefinition(Type endpointType, Type requestDtoType, T
         => $"{ReqDtoType.BindableProps().FirstOrDefault(p => p.IsDefined(Types.FromBodyAttribute))?.Name}.";
 
     ServiceBoundEpProp[] GetServiceBoundEpProps()
-        => EndpointType.GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.FlattenHierarchy)
-                       .Where(
-                           p => p is { CanRead: true, CanWrite: true } &&
-                                !p.IsDefined(Types.DontInjectAttribute))
+        => EndpointType.BindableProps()
                        .Select(
                            p => new ServiceBoundEpProp
                            {
-                               PropName = p.Name,
-                               PropType = p.PropertyType,
+                               PropertyInfo = p,
                                ServiceKey = p.GetCustomAttribute<KeyedServiceAttribute>()?.Key
                            })
                        .ToArray();
@@ -579,15 +579,18 @@ public sealed class EndpointDefinition(Type endpointType, Type requestDtoType, T
                    .Properties.Where(p => p.AttributeProvider?.IsDefined(Types.ToHeaderAttribute, true) is true)
                    .Select(CreateProps)
                    .ToArray() ??
-                   Array.Empty<ToHeaderProp>();
+                   [];
 
             ToHeaderProp CreateProps(JsonPropertyInfo p)
                 => new(
-                    headerName: p.AttributeProvider?.GetCustomAttributes(Types.ToHeaderAttribute, true).Cast<ToHeaderAttribute>().FirstOrDefault()?.HeaderName ?? p.Name,
+                    headerName: p.AttributeProvider?.GetCustomAttributes(Types.ToHeaderAttribute, true)
+                                 .Cast<ToHeaderAttribute>()
+                                 .FirstOrDefault()?.HeaderName ??
+                                p.Name,
                     getter: p.Get);
         }
     #else
-        return Array.Empty<ToHeaderProp>();
+        return [];
     #endif
     }
 }
@@ -609,10 +612,11 @@ public sealed class EpVersion
 
 sealed class ServiceBoundEpProp
 {
-    public string PropName { get; init; } = null!;
+    //public string PropName { get; init; } = null!;
+    //public Type PropType { get; init; } = null!;
+    public PropertyInfo PropertyInfo { get; set; }
     public string? ServiceKey { get; init; }
     public Action<object, object>? PropSetter { get; set; }
-    public Type PropType { get; init; } = null!;
 }
 
 sealed class ToHeaderProp(string headerName, Func<object, object?>? getter)

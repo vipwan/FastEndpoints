@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
 namespace FastEndpoints.Security;
@@ -30,7 +31,7 @@ public static class AuthExtensions
                 .AddJwtBearer(
                     o =>
                     {
-                        var sOpts = new JwtSigningOptions();
+                        var sOpts = Cfg.ServiceResolver.TryResolve<IOptions<JwtSigningOptions>>()?.Value ?? new JwtSigningOptions();
                         signingOptions(sOpts);
 
                         SecurityKey? key = null;
@@ -70,8 +71,8 @@ public static class AuthExtensions
                         o.TokenValidationParameters.ValidateIssuer = false;
 
                         //set sensible defaults (based on configuration) for the claim mapping so tokens created with JWTBearer.CreateToken() will not be modified
-                        o.TokenValidationParameters.NameClaimType = Conf.SecOpts.NameClaimType;
-                        o.TokenValidationParameters.RoleClaimType = Conf.SecOpts.RoleClaimType;
+                        o.TokenValidationParameters.NameClaimType = Cfg.SecOpts.NameClaimType;
+                        o.TokenValidationParameters.RoleClaimType = Cfg.SecOpts.RoleClaimType;
                         o.MapInboundClaims = false;
 
                         bearerOptions?.Invoke(o);
@@ -128,7 +129,9 @@ public static class AuthExtensions
     /// </summary>
     /// <param name="validFor">specify how long the created cookie is valid for with a <see cref="TimeSpan" /></param>
     /// <param name="options">optional action for configuring cookie authentication options</param>
-    public static IServiceCollection AddAuthenticationCookie(this IServiceCollection services, TimeSpan validFor, Action<CookieAuthenticationOptions>? options = null)
+    public static IServiceCollection AddAuthenticationCookie(this IServiceCollection services,
+                                                             TimeSpan validFor,
+                                                             Action<CookieAuthenticationOptions>? options = null)
     {
         services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
                 .AddCookie(
@@ -141,7 +144,9 @@ public static class AuthExtensions
                         o.ExpireTimeSpan = validFor;
                         o.Cookie.HttpOnly = true;
                         o.Cookie.SameSite = SameSiteMode.Lax;
-                        o.Events = new()
+
+                        // ReSharper disable once ArrangeObjectCreationWhenTypeNotEvident
+                        o.Events = new CookieAuthenticationEvents
                         {
                             OnRedirectToLogin =
                                 ctx =>
@@ -175,7 +180,9 @@ public static class AuthExtensions
     }
 
     [Obsolete("Use AddAuthenticationCookie() method.")]
-    public static IServiceCollection AddCookieAuth(this IServiceCollection services, TimeSpan validFor, Action<CookieAuthenticationOptions>? options = null)
+    public static IServiceCollection AddCookieAuth(this IServiceCollection services,
+                                                   TimeSpan validFor,
+                                                   Action<CookieAuthenticationOptions>? options = null)
         => AddAuthenticationCookie(services, validFor, options);
 
     /// <summary>
@@ -183,7 +190,7 @@ public static class AuthExtensions
     /// </summary>
     /// <param name="permissionCode">the permission code to check for</param>
     public static bool HasPermission(this ClaimsPrincipal principal, string permissionCode)
-        => principal.FindAll(Conf.SecOpts.PermissionsClaimType).Select(c => c.Value).Contains(permissionCode);
+        => principal.FindAll(Cfg.SecOpts.PermissionsClaimType).Select(c => c.Value).Contains(permissionCode);
 
     /// <summary>
     /// determines if the current user principal has the given claim type

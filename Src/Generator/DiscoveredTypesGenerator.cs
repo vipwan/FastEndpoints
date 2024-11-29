@@ -15,13 +15,13 @@ public class DiscoveredTypesGenerator : IIncrementalGenerator
     const string DontRegisterAttribute = "DontRegisterAttribute";
 
     static readonly string[] _whiteList =
-    {
+    [
         "FastEndpoints.IEndpoint",
         "FastEndpoints.IEventHandler",
         "FastEndpoints.ICommandHandler",
         "FastEndpoints.ISummary",
         "FluentValidation.IValidator"
-    };
+    ];
 
     public void Initialize(IncrementalGeneratorInitializationContext ctx)
     {
@@ -32,9 +32,11 @@ public class DiscoveredTypesGenerator : IIncrementalGenerator
 
         ctx.RegisterSourceOutput(syntaxProvider, Generate!);
 
+        //executed per each keystroke
         static bool Qualify(SyntaxNode node, CancellationToken _)
             => node is ClassDeclarationSyntax { TypeParameterList: null };
 
+        //executed per each keystroke but only for syntax nodes filtered by the Qualify method
         static string? Transform(GeneratorSyntaxContext ctx, CancellationToken _)
         {
             //should be re-assigned on every call. do not cache!
@@ -51,6 +53,7 @@ public class DiscoveredTypesGenerator : IIncrementalGenerator
         }
     }
 
+    //only executed if the equality comparer says the data is not what has been cached by roslyn
     static void Generate(SourceProductionContext spc, ImmutableArray<string> typeNames)
     {
         if (typeNames.Length == 0)
@@ -64,14 +67,16 @@ public class DiscoveredTypesGenerator : IIncrementalGenerator
     {
         b.Clear().w(
             $$"""
+              #pragma warning disable CS0618
+
               namespace {{_assemblyName}};
 
               using System;
 
               public static class DiscoveredTypes
               {
-                  public static readonly Type[] All = new Type[]
-                  {
+                  public static readonly List<Type> All =
+                  [
               """);
 
         foreach (var t in discoveredTypes.Distinct().OrderBy(t => t))
@@ -85,7 +90,7 @@ public class DiscoveredTypesGenerator : IIncrementalGenerator
         b.w(
             """
             
-                };
+                ];
             }
             """);
 

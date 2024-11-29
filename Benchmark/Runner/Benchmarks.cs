@@ -1,12 +1,13 @@
-﻿using System.Diagnostics.CodeAnalysis;
+﻿using System.Text;
+using System.Text.Json;
 using BenchmarkDotNet.Attributes;
 using Microsoft.AspNetCore.Mvc.Testing;
-using System.Text;
-using System.Text.Json;
+
+#pragma warning disable CA1822
 
 namespace Runner;
 
-[MemoryDiagnoser, SimpleJob(launchCount: 1, warmupCount: 1, iterationCount: 10, invocationCount: 10000), SuppressMessage("Performance", "CA1822:Mark members as static")]
+[MemoryDiagnoser]
 public class Benchmarks
 {
     const string QueryObjectParams = "?id=101&FirstName=Name&LastName=LastName&Age=23&phoneNumbers[0]=223422&phonenumbers[1]=11144" +
@@ -53,7 +54,7 @@ public class Benchmarks
         return FastEndpointClient.SendAsync(msg);
     }
 
-    [Benchmark]
+    //[Benchmark]
     public Task FastEndpointsStructDto()
     {
         var msg = new HttpRequestMessage
@@ -105,7 +106,7 @@ public class Benchmarks
         return FeScopedValidatorClient.SendAsync(msg);
     }
 
-    //[Benchmark]
+    [Benchmark]
     public Task AspNetCoreMvc()
     {
         var msg = new HttpRequestMessage

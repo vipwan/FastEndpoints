@@ -19,13 +19,22 @@ sealed class EndpointData
             throw new InvalidOperationException("FastEndpoints was unable to find any endpoint declarations!");
     }
 
-    static EndpointDefinition[] BuildEndpointDefinitions(EndpointDiscoveryOptions options, CommandHandlerRegistry cmdHandlerRegistry)
+    static EndpointDefinition[] BuildEndpointDefinitions(EndpointDiscoveryOptions opts, CommandHandlerRegistry cmdHandlerRegistry)
     {
-        if (options.DisableAutoDiscovery && options.Assemblies?.Any() is false)
-            throw new InvalidOperationException("If 'DisableAutoDiscovery' is true, a collection of `Assemblies` must be provided!");
-
-        IEnumerable<string> exclusions = new[]
+        if (opts.DisableAutoDiscovery && opts.Assemblies?.Any() is false)
         {
+            throw new InvalidOperationException(
+                $"If '{nameof(opts.DisableAutoDiscovery)}' is true, a collection of `{nameof(opts.Assemblies)}` must be provided!");
+        }
+
+        if (opts.SourceGeneratorDiscoveredTypes.Count > 0 && opts.Assemblies?.Any() is true)
+        {
+            throw new InvalidOperationException(
+                $"{nameof(opts.SourceGeneratorDiscoveredTypes)}' and `{nameof(opts.Assemblies)}` cannot be used together! Choose only one of these strategies.");
+        }
+
+        IEnumerable<string> exclusions =
+        [
             "Microsoft",
             "System",
             "FastEndpoints",
@@ -45,40 +54,39 @@ sealed class EndpointData
             "PresentationFramework",
             "PresentationCore",
             "WindowsBase"
-        };
+        ];
 
-        var discoveredTypes = options.SourceGeneratorDiscoveredTypes.AsEnumerable();
+        var discoveredTypes = opts.SourceGeneratorDiscoveredTypes.AsEnumerable();
 
         if (!discoveredTypes.Any())
         {
             var assemblies = Enumerable.Empty<Assembly>();
 
-            if (options.Assemblies?.Any() is true)
-                assemblies = options.Assemblies;
+            if (opts.Assemblies?.Any() is true)
+                assemblies = opts.Assemblies;
 
-            if (!options.DisableAutoDiscovery)
+            if (!opts.DisableAutoDiscovery)
                 assemblies = assemblies.Union(AppDomain.CurrentDomain.GetAssemblies());
 
-            if (options.AssemblyFilter is not null)
-                assemblies = assemblies.Where(options.AssemblyFilter);
+            if (opts.AssemblyFilter is not null)
+                assemblies = assemblies.Where(opts.AssemblyFilter);
 
             discoveredTypes = assemblies
-                              .Where(a => !a.IsDynamic && (options.Assemblies?.Contains(a) is true || !exclusions.Any(x => a.FullName!.StartsWith(x))))
+                              .Where(a => !a.IsDynamic && (opts.Assemblies?.Contains(a) is true || !exclusions.Any(x => a.FullName!.StartsWith(x))))
                               .SelectMany(a => a.GetTypes())
                               .Where(
                                   t =>
                                       !t.IsDefined(Types.DontRegisterAttribute) &&
                                       t is { IsAbstract: false, IsInterface: false, IsGenericType: false } &&
                                       t.GetInterfaces().Intersect(
-                                          new[]
-                                          {
-                                              Types.IEndpoint,
-                                              Types.IEventHandler,
-                                              Types.ICommandHandler,
-                                              Types.ISummary,
-                                              options.IncludeAbstractValidators ? Types.IValidator : Types.IEndpointValidator
-                                          }).Any() &&
-                                      (options.Filter is null || options.Filter(t)));
+                                      [
+                                          Types.IEndpoint,
+                                          Types.IEventHandler,
+                                          Types.ICommandHandler,
+                                          Types.ISummary,
+                                          opts.IncludeAbstractValidators ? Types.IValidator : Types.IEndpointValidator
+                                      ]).Any() &&
+                                      (opts.Filter is null || opts.Filter(t)));
         }
 
         //Endpoint<TRequest>
@@ -207,18 +215,22 @@ sealed class EndpointData
                 {
                     case true when hasHttpAttrib:
                         throw new InvalidOperationException(
-                            $"The endpoint [{x.tEndpoint.FullName}] has both Configure() method and attribute decorations on the class level. Only one of those strategies should be used!");
+                            $"The endpoint [{x.tEndpoint.FullName}] has both Configure() method and attribute decorations on the class level. " +
+                            $"Only one of those strategies should be used!");
                     case false when !hasHttpAttrib:
                         throw new InvalidOperationException(
-                            $"The endpoint [{x.tEndpoint.FullName}] should either override the Configure() method or decorate the class with a [Http*(...)] attribute!");
+                            $"The endpoint [{x.tEndpoint.FullName}] should either override the Configure() method or decorate the class with a " +
+                            $"[Http*(...)] attribute!");
                 }
 
                 switch (implementsHandleAsync)
                 {
                     case false when !implementsExecuteAsync:
-                        throw new InvalidOperationException($"The endpoint [{x.tEndpoint.FullName}] must implement either [HandleAsync] or [ExecuteAsync] methods!");
+                        throw new InvalidOperationException(
+                            $"The endpoint [{x.tEndpoint.FullName}] must implement either [HandleAsync] or [ExecuteAsync] methods!");
                     case true when implementsExecuteAsync:
-                        throw new InvalidOperationException($"The endpoint [{x.tEndpoint.FullName}] has both [HandleAsync] and [ExecuteAsync] methods implemented!");
+                        throw new InvalidOperationException(
+                            $"The endpoint [{x.tEndpoint.FullName}] has both [HandleAsync] and [ExecuteAsync] methods implemented!");
                 }
 
                 if (valDict.TryGetValue(def.ReqDtoType, out var val))

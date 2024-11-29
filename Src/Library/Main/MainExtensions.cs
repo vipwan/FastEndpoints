@@ -1,5 +1,7 @@
 ﻿using System.Collections.Concurrent;
 using System.Text;
+using FluentValidation;
+using FluentValidation.Internal;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
@@ -67,11 +69,33 @@ public static class MainExtensions
         Cfg.SerOpts.Options = jsonOpts is not null
                                   ? new(jsonOpts) //make a copy to avoid configAction modifying the global JsonOptions
                                   : Cfg.SerOpts.Options;
+        configAction?.Invoke(app.ServiceProvider.GetRequiredService<Cfg>());
+
+        if (Cfg.ValOpts.UsePropertyNamingPolicy && Cfg.SerOpts.Options.PropertyNamingPolicy is not null)
+        {
+            ValidatorOptions.Global.PropertyNameResolver =
+                (_, memberInfo, expression) =>
+                {
+                    if (memberInfo is null)
+                        return null;
+
+                    if (expression is null)
+                        return Cfg.SerOpts.Options.PropertyNamingPolicy.ConvertName(memberInfo.Name);
+
+                    var chain = PropertyChain.FromExpression(expression);
+
+                    return Cfg.SerOpts.Options.PropertyNamingPolicy.ConvertName(chain.Count > 0 ? chain.ToString() : memberInfo.Name);
+                };
+        }
+
     #if NET8_0_OR_GREATER
         Cfg.SerOpts.Options.IgnoreToHeaderAttributes();
         Cfg.BndOpts.AddTypedHeaderValueParsers(Cfg.SerOpts.Options);
+
+        //https://github.com/FastEndpoints/FastEndpoints/issues/669
+        if (Cfg.SerOpts.EnableJsonIgnoreAttributeOnRequiredProperties)
+            Cfg.SerOpts.Options.EnableJsonIgnoreAttributesOnRequiredProps();
     #endif
-        configAction?.Invoke(app.ServiceProvider.GetRequiredService<Cfg>());
 
         var endpoints = app.ServiceProvider.GetRequiredService<EndpointData>();
         var epFactory = app.ServiceProvider.GetRequiredService<IEndpointFactory>();
@@ -102,7 +126,6 @@ public static class MainExtensions
 
             AddSecurityPolicy(authOptions, def);
 
-            var authorizeAttributes = BuildAuthorizeAttributes(def);
             var routeNum = 0;
 
             foreach (var route in def.Routes)
@@ -116,14 +139,16 @@ public static class MainExtensions
                 {
                     var hb = app.MapMethods(
                         finalRoute,
-                        new[] { verb },
+                        [verb],
                         (HttpContext ctx, [FromServices] IEndpointFactory factory) => RequestHandler.Invoke(ctx, factory));
 
                     hb.WithName(
-                        def.EndpointType.EndpointName(
-                            def.Verbs.Length > 1 ? verb : null,
-                            def.Routes.Length > 1 ? routeNum : null,
-                            def.EndpointTags?.Count > 0 ? def.EndpointTags[0] : null)); //user can override this via Options(x=>x.WithName(...))
+                        Cfg.EpOpts.NameGenerator(
+                            new(
+                                def.EndpointType,
+                                def.Verbs.Length > 1 ? verb : null,
+                                def.Routes.Length > 1 ? routeNum : null,
+                                def.EndpointTags?.Count > 0 ? def.EndpointTags[0] : null))); //user can override this via Options(x=>x.WithName(...))
 
                     hb.WithMetadata(def);
 
@@ -135,7 +160,7 @@ public static class MainExtensions
                     if (def.AnonymousVerbs?.Contains(verb) is true)
                         hb.AllowAnonymous();
                     else
-                        hb.RequireAuthorization(authorizeAttributes);
+                        hb.RequireAuthorization(BuildAuthorizeAttributes(def));
 
                     if (def.ResponseCacheSettings is not null)
                         hb.WithMetadata(def.ResponseCacheSettings);
@@ -312,7 +337,10 @@ public static class MainExtensions
                     if (ep.AllowAnyClaim)
                         b.RequireAssertion(x => x.User.Claims.Any(c => ep.AllowedClaimTypes.Contains(c.Type, StringComparer.OrdinalIgnoreCase)));
                     else
-                        b.RequireAssertion(x => ep.AllowedClaimTypes.All(t => x.User.Claims.Any(c => string.Equals(c.Type, t, StringComparison.OrdinalIgnoreCase))));
+                    {
+                        b.RequireAssertion(
+                            x => ep.AllowedClaimTypes.All(t => x.User.Claims.Any(c => string.Equals(c.Type, t, StringComparison.OrdinalIgnoreCase))));
+                    }
                 }
 
                 ep.PolicyBuilder?.Invoke(b);

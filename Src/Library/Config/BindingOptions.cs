@@ -1,8 +1,8 @@
 ﻿using System.Diagnostics.CodeAnalysis;
-using FluentValidation.Results;
-using Microsoft.Extensions.Primitives;
 using System.Reflection;
 using System.Text.Json;
+using FluentValidation.Results;
+using Microsoft.Extensions.Primitives;
 
 namespace FastEndpoints;
 
@@ -12,6 +12,13 @@ namespace FastEndpoints;
 [SuppressMessage("Performance", "CA1822:Mark members as static")]
 public sealed class BindingOptions
 {
+    /// <summary>
+    /// the central cache of request dto related reflection data.
+    /// populating this cache with source generated data will eliminate expression compilations during runtime as well as usage of
+    /// reflection based property setters, etc. see the source generator documentation on how to populate this cache with generated data.
+    /// </summary>
+    public ReflectionCache ReflectionCache { get; } = new();
+
     /// <summary>
     /// a function used to construct the failure message when a supplied value cannot be successfully bound to a dto property during model binding.
     /// <para>
@@ -50,15 +57,19 @@ public sealed class BindingOptions
           };
 
     /// <summary>
-    /// this http status code will be used for all automatically sent <see cref="JsonException" /> responses  which are built using the <see cref="JsonExceptionTransformer" />
+    /// this http status code will be used for all automatically sent <see cref="JsonException" /> responses  which are built using the
+    /// <see cref="JsonExceptionTransformer" />
     /// func. defaults to 400.
     /// </summary>
     public int JsonExceptionStatusCode { internal get; set; } = 400;
 
     /// <summary>
-    /// if this function is specified, any internal exceptions that are thrown by asp.net when accessing multipart form data will be caught and transformed to validation
-    /// failures using this function. by default those exceptions are not caught and thrown out to the middleware pipeline. setting this func might come in handy if
-    /// you need 413 responses (that arise from incoming request body size exceeding kestrel's <c>MaxRequestBodySize</c>) automatically transformed to 400 problem details
+    /// if this function is specified, any internal exceptions that are thrown by asp.net when accessing multipart form data will be caught and transformed to
+    /// validation
+    /// failures using this function. by default those exceptions are not caught and thrown out to the middleware pipeline. setting this func might come in handy
+    /// if
+    /// you need 413 responses (that arise from incoming request body size exceeding kestrel's <c>MaxRequestBodySize</c>) automatically transformed to 400 problem
+    /// details
     /// responses.
     /// </summary>
     public Func<Exception, ValidationFailure>? FormExceptionTransformer { internal get; set; }
@@ -92,7 +103,7 @@ public sealed class BindingOptions
     /// {
     ///     c.Binding.ValueParserFor&lt;Guid&gt;(MyParsers.GuidParser);
     /// });
-    ///
+    /// 
     /// public static class MyParsers
     /// {
     ///     public static ParseResult GuidParser(object? input)
@@ -124,7 +135,7 @@ public sealed class BindingOptions
     /// {
     ///     c.Binding.ValueParserFor(typeof(Guid), MyParsers.GuidParser);
     /// });
-    ///
+    /// 
     /// public static class MyParsers
     /// {
     ///     public static ParseResult GuidParser(object? input)

@@ -18,9 +18,9 @@ public class MaxRequestBodyLimitTests : IAsyncLifetime
                 o.Limits.MaxRequestBodySize = 100; //this doesn't work with WAF/TestServer :-(
                 o.ListenLocalhost(100);
             });
-        bld.Services.AddFastEndpoints(o => o.Filter = t => t == typeof(Endpoint));
+        bld.Services.AddFastEndpoints(o => o.Filter = (Type t) => t == typeof(Endpoint));
         var app = bld.Build();
-        app.UseFastEndpoints(c => c.Binding.FormExceptionTransformer = ex => new("formErrors", ex.Message));
+        app.UseFastEndpoints(c => c.Binding.FormExceptionTransformer = (Exception ex) => new("formErrors", ex.Message));
         _app = app;
     }
 
@@ -52,7 +52,7 @@ public class MaxRequestBodyLimitTests : IAsyncLifetime
 
     sealed class Request
     {
-        public IFormFile File { get; init; } = default!;
+        public IFormFile File { get; set; } = default!;
     }
 
     sealed class Endpoint : Endpoint<Request, string>

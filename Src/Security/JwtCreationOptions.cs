@@ -1,4 +1,7 @@
-﻿using Microsoft.IdentityModel.Tokens;
+﻿using System.Security.Cryptography;
+using Microsoft.IdentityModel.Tokens;
+
+// ReSharper disable PropertyCanBeMadeInitOnly.Global
 
 namespace FastEndpoints.Security;
 
@@ -7,6 +10,27 @@ namespace FastEndpoints.Security;
 /// </summary>
 public sealed class JwtCreationOptions
 {
+    public JwtCreationOptions() { } //for DI to be able to instantiate this class
+
+    internal JwtCreationOptions(JwtCreationOptions? globalInstance)
+    {
+        if (globalInstance is null)
+            return;
+
+        SigningKey = globalInstance.SigningKey;
+        SigningStyle = globalInstance.SigningStyle;
+        SigningAlgorithm = globalInstance.SigningAlgorithm;
+        KeyIsPemEncoded = globalInstance.KeyIsPemEncoded;
+        AsymmetricKidGenerator = globalInstance.AsymmetricKidGenerator;
+        Audience = globalInstance.Audience;
+        Issuer = globalInstance.Issuer;
+        CompressionAlgorithm = globalInstance.CompressionAlgorithm;
+
+        //NOTE:
+        // we're skipping ExpireAt and User properties because they need to set by the user everytime a token is created.
+        // without this kind of cloning, the global instance would be used everywhere causing issues.
+    }
+
     /// <summary>
     /// the key used to sign jwts symmetrically or the base64 encoded private-key when jwts are signed asymmetrically.
     /// </summary>
@@ -33,8 +57,16 @@ public sealed class JwtCreationOptions
     /// </summary>
     public bool KeyIsPemEncoded { get; set; }
 
+#pragma warning disable CS1574
+    /// <summary>
+    /// if specified, this function will be used to generate a <c>kid</c> for asymmetric key generation.
+    /// the <c>string</c> value returned from this function will be set on the <see cref="RsaSecurityKey" />.<see cref="RsaSecurityKey.KeyId" /> property.
+    /// </summary>
+    public Func<RSA, string>? AsymmetricKidGenerator { get; set; }
+
     /// <summary>
     /// specify the privileges of the user
+    /// NOTE: this should be specified at the time of jwt creation.
     /// </summary>
     public UserPrivileges User { get; } = new();
 
@@ -50,6 +82,7 @@ public sealed class JwtCreationOptions
 
     /// <summary>
     /// the value of the 'expiration' claim. should be in utc.
+    /// NOTE: this should be set at the time of token creation.
     /// </summary>
     public DateTime? ExpireAt { get; set; }
 
